@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b14"/>
+      <stop offset="100%" stop-color="#0d1b2a"/>
+    </linearGradient>
+    <linearGradient id="cyanGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#4facfe"/>
+      <stop offset="100%" stop-color="#ffd200"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" stroke="#00f2fe" stroke-width="8" stroke-opacity="0.4"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#4facfe" stroke-width="4" stroke-dasharray="24 12" opacity="0.6"/>
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#ffd200" stroke-width="2" opacity="0.4"/>
+  <!-- Cyber Dragon Blade Sigil -->
+  <g filter="url(#glow)">
+    <path d="M256 60 L280 180 L350 210 L285 260 L320 380 L256 310 L192 380 L227 260 L162 210 L232 180 Z" fill="url(#cyanGold)"/>
+    <circle cx="256" cy="256" r="28" fill="#070b14" stroke="#00f2fe" stroke-width="6"/>
+    <circle cx="256" cy="256" r="10" fill="#ffd200"/>
+    <line x1="256" y1="40" x2="256" y2="472" stroke="#00f2fe" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+  </g>
+</svg>
