@@ -135,6 +135,14 @@ export abstract class EnemyBase3D {
     this.particles.emitHitSparks(this.rootMesh.position.add(new Vector3(0, 1.0, 0)), undefined, 16);
     this.soundManager.playHit(isCrit);
 
+    // Directional knockback impulse away from player
+    const away = this.rootMesh.position.subtract(this.targetPlayer.rootMesh.position);
+    away.y = 0;
+    if (away.lengthSquared() > 0.001) {
+      away.normalize();
+      this.rootMesh.moveWithCollisions(away.scale(isCrit ? 1.4 : 0.7));
+    }
+
     this.poise -= finalDamage * 0.5;
     if (this.poise <= 0) {
       this.stagger();

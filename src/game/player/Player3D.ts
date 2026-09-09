@@ -6,25 +6,25 @@ import {
   Color3,
   Vector3,
   TransformNode,
-  Quaternion,
-  SceneLoader
+  Ray
 } from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
 import { Weapon3D } from './Weapon3D';
 import { ThirdPersonCamera } from '../camera/ThirdPersonCamera';
 import { GameBridge } from '../GameBridge';
 import { SoundManager } from '../audio/SoundManager';
-import { loadProgress, saveProgress } from '../../utils/storage';
+import { loadProgress } from '../../utils/storage';
 
 export type PlayerAnimState =
   | 'idle'
-  | 'walk'
   | 'run'
-  | 'sprint'
+  | 'jump_start'
+  | 'airborne'
+  | 'land'
   | 'attack1'
   | 'attack2'
   | 'attack3'
   | 'heavy_charge'
+  | 'heavy_release'
   | 'dodge'
   | 'hurt'
   | 'death';
@@ -44,12 +44,13 @@ export class Player3D {
   public maxUltimate = 100;
 
   // Movement parameters
-  public speed = 0;
-  public baseSpeed = 5.2;
-  public sprintSpeed = 8.5;
-  public acceleration = 18.0;
-  public deceleration = 24.0;
+  public baseSpeed = 6.2;
   public currentVelocity = new Vector3(0, 0, 0);
+  public currentHeading = 0; // Rotation angle in radians
+  public isGrounded = true;
+  private verticalVelocity = 0;
+  private gravity = -26.0;
+  private jumpPower = 9.2;
 
   // States
   public animState: PlayerAnimState = 'idle';
@@ -59,38 +60,44 @@ export class Player3D {
   public isChargingHeavy = false;
   public isDead = false;
   public comboIndex = 0;
-  private comboResetTimer = 0;
-  private attackTimer = 0;
-  private chargeTimer = 0;
+  public onAttackHitCheck: ((isHeavy: boolean, damage: number) => void) | null = null;
+  private hasCheckedHitThisAttack = false;
 
-  // Unlocks
+  // Timers
+  private stateTimer = 0;
+  private comboResetTimer = 0;
+  private sheathTimer = 0;
+  private stridePhase = 0;
+  private idleTime = 0;
+
+  // Abilities
   public waveAbilityUnlocked = false;
   public ultimateUnlocked = false;
   public abilityCooldown = 0;
   public maxAbilityCooldown = 6000;
 
-  // 3D Joint Hierarchy for Skeletal Animation
-  public hipsNode: TransformNode;
-  public spineNode: TransformNode;
-  public chestNode: TransformNode;
-  public headNode: TransformNode;
-  public leftArmNode: TransformNode;
-  public rightArmNode: TransformNode;
-  public leftLegNode: TransformNode;
-  public rightLegNode: TransformNode;
+  // Articulated Skeleton Nodes
+  public hipsNode!: TransformNode;
+  public spineNode!: TransformNode;
+  public chestNode!: TransformNode;
+  public headNode!: TransformNode;
+  public leftShoulderNode!: TransformNode;
+  public leftElbowNode!: TransformNode;
+  public leftHandNode!: TransformNode;
+  public rightShoulderNode!: TransformNode;
+  public rightElbowNode!: TransformNode;
+  public rightHandNode!: TransformNode;
+  public sheathMountNode!: TransformNode;
+  public leftHipNode!: TransformNode;
+  public leftKneeNode!: TransformNode;
+  public leftFootNode!: TransformNode;
+  public rightHipNode!: TransformNode;
+  public rightKneeNode!: TransformNode;
+  public rightFootNode!: TransformNode;
+
   public visibleMeshes: Mesh[] = [];
-
-  // Materials
-  private cyberArmorMat: StandardMaterial;
-  private skinMat: StandardMaterial;
-  private hairMat: StandardMaterial;
-
-  // Audio
   private soundManager: SoundManager;
-
-  // Input states
   private inputKeys: { [key: string]: boolean } = {};
-  private animTimer = 0;
 
   constructor(scene: Scene, camera: ThirdPersonCamera, spawnPos: Vector3) {
     this.scene = scene;
@@ -101,181 +108,283 @@ export class Player3D {
     this.waveAbilityUnlocked = progress.unlockedWaveAbility;
     this.ultimateUnlocked = progress.unlockedUltimate;
 
-    // 1. Root Collider Mesh (Invisible capsule for movement physics)
+    // 1. Root Collider Mesh (Invisible physical entity)
     this.rootMesh = MeshBuilder.CreateCapsule('playerCollider', {
-      radius: 0.45,
+      radius: 0.42,
       height: 1.85,
       tessellation: 16
     }, scene);
     this.rootMesh.position = spawnPos.clone();
     this.rootMesh.checkCollisions = true;
-    this.rootMesh.ellipsoid = new Vector3(0.45, 0.92, 0.45);
+    this.rootMesh.ellipsoid = new Vector3(0.42, 0.92, 0.42);
     this.rootMesh.ellipsoidOffset = new Vector3(0, 0.92, 0);
-    this.rootMesh.visibility = 0; // Hide collision capsule
+    this.rootMesh.visibility = 0;
 
-    // 2. Materials
-    this.cyberArmorMat = new StandardMaterial('cyberHanfuMat', scene);
-    this.cyberArmorMat.diffuseColor = new Color3(0.06, 0.10, 0.16); // Deep obsidian
-    this.cyberArmorMat.emissiveColor = new Color3(0.0, 0.35, 0.45); // Ancient jade-circuit glow
-    this.cyberArmorMat.specularColor = new Color3(0.4, 0.8, 1.0);
+    // 2. Build Sculpted Cyber-Fantasy Warrior Anatomy
+    this.buildCharacterHierarchy(scene);
 
-    this.skinMat = new StandardMaterial('skinMat', scene);
-    this.skinMat.diffuseColor = new Color3(0.92, 0.84, 0.78); // Porcelain anime skin
+    // 3. Attach Cyber-Katana to Hand and Sheath Mount
+    this.weapon = new Weapon3D(scene, this.rightHandNode, this.sheathMountNode);
+    this.visibleMeshes.push(
+      this.weapon.bladeMesh,
+      this.weapon.guardMesh,
+      this.weapon.hiltMesh,
+      this.weapon.sayaMesh
+    );
 
-    this.hairMat = new StandardMaterial('hairMat', scene);
-    this.hairMat.diffuseColor = new Color3(0.05, 0.08, 0.14); // Raven blue hair
+    // 4. Set Up User Controls
+    this.initInputs();
+  }
 
-    // 3. Build 3D Skinned Anatomy Hierarchy
+  private buildCharacterHierarchy(scene: Scene) {
+    // --- Premium Materials ---
+    // Obsidian Carbon Armor
+    const armorMat = new StandardMaterial('warriorArmorMat', scene);
+    armorMat.diffuseColor = new Color3(0.08, 0.11, 0.16);
+    armorMat.specularColor = new Color3(0.4, 0.6, 0.8);
+    armorMat.specularPower = 64;
+
+    // Luminous Jade-Cyan Circuit Trims
+    const circuitMat = new StandardMaterial('warriorCircuitMat', scene);
+    circuitMat.diffuseColor = new Color3(0.02, 0.18, 0.22);
+    circuitMat.emissiveColor = new Color3(0.0, 0.85, 0.95);
+    circuitMat.specularColor = new Color3(0.8, 1.0, 1.0);
+
+    // Imperial Gold Accents
+    const goldMat = new StandardMaterial('warriorGoldMat', scene);
+    goldMat.diffuseColor = new Color3(0.85, 0.68, 0.2);
+    goldMat.emissiveColor = new Color3(0.25, 0.18, 0.05);
+
+    // Porcelain Anime Skin
+    const skinMat = new StandardMaterial('warriorSkinMat', scene);
+    skinMat.diffuseColor = new Color3(0.94, 0.87, 0.82);
+
+    // Raven Black Hair
+    const hairMat = new StandardMaterial('warriorHairMat', scene);
+    hairMat.diffuseColor = new Color3(0.04, 0.05, 0.08);
+
+    // --- Joint Hierarchy ---
+    // Hips / Pelvis
     this.hipsNode = new TransformNode('hips', scene);
     this.hipsNode.parent = this.rootMesh;
     this.hipsNode.position.y = 0.92;
 
-    // Torso / Hanfu robe
-    const torsoMesh = MeshBuilder.CreateCylinder('torso', {
-      height: 0.65,
-      diameterTop: 0.38,
-      diameterBottom: 0.32
-    }, scene);
-    torsoMesh.parent = this.hipsNode;
-    torsoMesh.position.y = 0.25;
-    torsoMesh.material = this.cyberArmorMat;
+    const pelvisMesh = MeshBuilder.CreateBox('pelvis', { width: 0.36, height: 0.22, depth: 0.26 }, scene);
+    pelvisMesh.parent = this.hipsNode;
+    pelvisMesh.material = armorMat;
+    this.visibleMeshes.push(pelvisMesh);
 
+    // Gold waist sash
+    const sash = MeshBuilder.CreateBox('sash', { width: 0.38, height: 0.08, depth: 0.28 }, scene);
+    sash.parent = this.hipsNode;
+    sash.position.y = 0.08;
+    sash.material = goldMat;
+    this.visibleMeshes.push(sash);
+
+    // Katana Sheath Mount (Left Hip - angled naturally)
+    this.sheathMountNode = new TransformNode('sheathMount', scene);
+    this.sheathMountNode.parent = this.hipsNode;
+    this.sheathMountNode.position = new Vector3(-0.22, 0.02, 0.02);
+    this.sheathMountNode.rotation = new Vector3(0.38, 0.15, 0.22);
+
+    // Spine & Chest
     this.spineNode = new TransformNode('spine', scene);
     this.spineNode.parent = this.hipsNode;
-    this.spineNode.position.y = 0.55;
+    this.spineNode.position.y = 0.12;
 
     this.chestNode = new TransformNode('chest', scene);
     this.chestNode.parent = this.spineNode;
-    this.chestNode.position.y = 0.15;
+    this.chestNode.position.y = 0.22;
+
+    // Sculpted Cuirass (Torso)
+    const cuirass = MeshBuilder.CreateCylinder('cuirass', {
+      height: 0.44,
+      diameterTop: 0.46,
+      diameterBottom: 0.32,
+      tessellation: 8
+    }, scene);
+    cuirass.parent = this.chestNode;
+    cuirass.position.y = 0.14;
+    cuirass.material = armorMat;
+    this.visibleMeshes.push(cuirass);
+
+    // Glowing chest circuit core
+    const chestCore = MeshBuilder.CreateBox('chestCore', { width: 0.08, height: 0.18, depth: 0.04 }, scene);
+    chestCore.parent = this.chestNode;
+    chestCore.position = new Vector3(0, 0.14, 0.18);
+    chestCore.material = circuitMat;
+    this.visibleMeshes.push(chestCore);
 
     // Head & Hair
     this.headNode = new TransformNode('head', scene);
     this.headNode.parent = this.chestNode;
-    this.headNode.position.y = 0.28;
+    this.headNode.position.y = 0.42;
 
-    const headMesh = MeshBuilder.CreateSphere('headMesh', { diameter: 0.26 }, scene);
+    const headMesh = MeshBuilder.CreateSphere('headMesh', { diameter: 0.24, segments: 16 }, scene);
     headMesh.parent = this.headNode;
-    headMesh.material = this.skinMat;
+    headMesh.material = skinMat;
+    this.visibleMeshes.push(headMesh);
 
-    // Anime styled hair buns & hairpin
-    const hairMesh = MeshBuilder.CreateSphere('hairMesh', { diameter: 0.29 }, scene);
-    hairMesh.parent = this.headNode;
-    hairMesh.position.y = 0.04;
-    hairMesh.position.z = -0.04;
-    hairMesh.material = this.hairMat;
+    // Cyan glowing ocular brow/visor
+    const visor = MeshBuilder.CreateBox('ocularVisor', { width: 0.22, height: 0.04, depth: 0.12 }, scene);
+    visor.parent = this.headNode;
+    visor.position = new Vector3(0, 0.04, 0.09);
+    visor.material = circuitMat;
+    this.visibleMeshes.push(visor);
 
-    const hairPin = MeshBuilder.CreateCylinder('hairPin', {
-      height: 0.35,
-      diameter: 0.018
-    }, scene);
+    // Anime styled hair buns & ponytail
+    const hairTop = MeshBuilder.CreateSphere('hairTop', { diameter: 0.26, segments: 12 }, scene);
+    hairTop.parent = this.headNode;
+    hairTop.position = new Vector3(0, 0.06, -0.04);
+    hairTop.material = hairMat;
+    this.visibleMeshes.push(hairTop);
+
+    const hairBun = MeshBuilder.CreateSphere('hairBun', { diameter: 0.16 }, scene);
+    hairBun.parent = this.headNode;
+    hairBun.position = new Vector3(0, 0.16, -0.12);
+    hairBun.material = hairMat;
+    this.visibleMeshes.push(hairBun);
+
+    const hairPin = MeshBuilder.CreateCylinder('hairPin', { height: 0.32, diameter: 0.015 }, scene);
     hairPin.parent = this.headNode;
-    hairPin.position.y = 0.06;
-    hairPin.rotation.z = Math.PI / 2;
-    const goldMat = new StandardMaterial('pinGold', scene);
-    goldMat.emissiveColor = new Color3(0.8, 0.65, 0.15);
+    hairPin.position = new Vector3(0, 0.18, -0.12);
+    hairPin.rotation.z = Math.PI / 2.8;
     hairPin.material = goldMat;
+    this.visibleMeshes.push(hairPin);
 
-    // Arms
-    this.leftArmNode = new TransformNode('leftArm', scene);
-    this.leftArmNode.parent = this.chestNode;
-    this.leftArmNode.position = new Vector3(-0.25, 0.05, 0);
+    // --- Arms (Left & Right) ---
+    // Left Arm
+    this.leftShoulderNode = new TransformNode('leftShoulder', scene);
+    this.leftShoulderNode.parent = this.chestNode;
+    this.leftShoulderNode.position = new Vector3(-0.28, 0.24, 0);
 
-    const leftArmMesh = MeshBuilder.CreateCylinder('leftArmMesh', { height: 0.55, diameter: 0.11 }, scene);
-    leftArmMesh.parent = this.leftArmNode;
-    leftArmMesh.position.y = -0.25;
-    leftArmMesh.material = this.cyberArmorMat;
+    const leftPauldron = MeshBuilder.CreateBox('leftPauldron', { width: 0.16, height: 0.12, depth: 0.16 }, scene);
+    leftPauldron.parent = this.leftShoulderNode;
+    leftPauldron.position.y = 0.04;
+    leftPauldron.material = goldMat;
+    this.visibleMeshes.push(leftPauldron);
 
-    this.rightArmNode = new TransformNode('rightArm', scene);
-    this.rightArmNode.parent = this.chestNode;
-    this.rightArmNode.position = new Vector3(0.25, 0.05, 0);
+    const leftUpperArm = MeshBuilder.CreateCylinder('leftUpperArm', { height: 0.28, diameter: 0.1 }, scene);
+    leftUpperArm.parent = this.leftShoulderNode;
+    leftUpperArm.position.y = -0.14;
+    leftUpperArm.material = armorMat;
+    this.visibleMeshes.push(leftUpperArm);
 
-    const rightArmMesh = MeshBuilder.CreateCylinder('rightArmMesh', { height: 0.55, diameter: 0.11 }, scene);
-    rightArmMesh.parent = this.rightArmNode;
-    rightArmMesh.position.y = -0.25;
-    rightArmMesh.material = this.cyberArmorMat;
+    this.leftElbowNode = new TransformNode('leftElbow', scene);
+    this.leftElbowNode.parent = this.leftShoulderNode;
+    this.leftElbowNode.position.y = -0.28;
 
-    // Legs
-    this.leftLegNode = new TransformNode('leftLeg', scene);
-    this.leftLegNode.parent = this.hipsNode;
-    this.leftLegNode.position = new Vector3(-0.14, -0.1, 0);
+    const leftForearm = MeshBuilder.CreateCylinder('leftForearm', { height: 0.26, diameter: 0.09 }, scene);
+    leftForearm.parent = this.leftElbowNode;
+    leftForearm.position.y = -0.13;
+    leftForearm.material = circuitMat;
+    this.visibleMeshes.push(leftForearm);
 
-    const leftLegMesh = MeshBuilder.CreateCylinder('leftLegMesh', { height: 0.75, diameter: 0.14 }, scene);
-    leftLegMesh.parent = this.leftLegNode;
-    leftLegMesh.position.y = -0.35;
-    leftLegMesh.material = this.cyberArmorMat;
+    this.leftHandNode = new TransformNode('leftHand', scene);
+    this.leftHandNode.parent = this.leftElbowNode;
+    this.leftHandNode.position.y = -0.26;
 
-    this.rightLegNode = new TransformNode('rightLeg', scene);
-    this.rightLegNode.parent = this.hipsNode;
-    this.rightLegNode.position = new Vector3(0.14, -0.1, 0);
+    const leftHandMesh = MeshBuilder.CreateBox('leftHandMesh', { width: 0.07, height: 0.09, depth: 0.05 }, scene);
+    leftHandMesh.parent = this.leftHandNode;
+    leftHandMesh.material = skinMat;
+    this.visibleMeshes.push(leftHandMesh);
 
-    const rightLegMesh = MeshBuilder.CreateCylinder('rightLegMesh', { height: 0.75, diameter: 0.14 }, scene);
-    rightLegMesh.parent = this.rightLegNode;
-    rightLegMesh.position.y = -0.35;
-    rightLegMesh.material = this.cyberArmorMat;
+    // Right Arm (Weapon Arm)
+    this.rightShoulderNode = new TransformNode('rightShoulder', scene);
+    this.rightShoulderNode.parent = this.chestNode;
+    this.rightShoulderNode.position = new Vector3(0.28, 0.24, 0);
 
-    this.visibleMeshes.push(
-      torsoMesh,
-      headMesh,
-      hairMesh,
-      hairPin,
-      leftArmMesh,
-      rightArmMesh,
-      leftLegMesh,
-      rightLegMesh
-    );
+    const rightPauldron = MeshBuilder.CreateBox('rightPauldron', { width: 0.16, height: 0.12, depth: 0.16 }, scene);
+    rightPauldron.parent = this.rightShoulderNode;
+    rightPauldron.position.y = 0.04;
+    rightPauldron.material = goldMat;
+    this.visibleMeshes.push(rightPauldron);
 
-    // 4. Attach 3D Signature Weapon to Right Arm Node
-    this.weapon = new Weapon3D(scene, this.rightArmNode);
+    const rightUpperArm = MeshBuilder.CreateCylinder('rightUpperArm', { height: 0.28, diameter: 0.1 }, scene);
+    rightUpperArm.parent = this.rightShoulderNode;
+    rightUpperArm.position.y = -0.14;
+    rightUpperArm.material = armorMat;
+    this.visibleMeshes.push(rightUpperArm);
 
-    // 5. Asynchronously load real 3D GLB Character Model
-    this.loadGlbModel();
+    this.rightElbowNode = new TransformNode('rightElbow', scene);
+    this.rightElbowNode.parent = this.rightShoulderNode;
+    this.rightElbowNode.position.y = -0.28;
 
-    // 6. Input Listeners
-    this.initInputs();
-  }
+    const rightForearm = MeshBuilder.CreateCylinder('rightForearm', { height: 0.26, diameter: 0.09 }, scene);
+    rightForearm.parent = this.rightElbowNode;
+    rightForearm.position.y = -0.13;
+    rightForearm.material = circuitMat;
+    this.visibleMeshes.push(rightForearm);
 
-  public glbRoot: TransformNode | null = null;
-  public glbMeshes: Mesh[] = [];
+    this.rightHandNode = new TransformNode('rightHand', scene);
+    this.rightHandNode.parent = this.rightElbowNode;
+    this.rightHandNode.position.y = -0.26;
 
-  private async loadGlbModel() {
-    try {
-      const result = await SceneLoader.ImportMeshAsync('', '/assets/characters/protagonist/', 'hero.glb', this.scene);
-      if (result && result.meshes.length > 0) {
-        const root = result.meshes[0];
-        this.glbRoot = root;
-        root.parent = this.rootMesh;
-        root.position = new Vector3(0, 0, 0);
+    const rightHandMesh = MeshBuilder.CreateBox('rightHandMesh', { width: 0.07, height: 0.09, depth: 0.05 }, scene);
+    rightHandMesh.parent = this.rightHandNode;
+    rightHandMesh.material = skinMat;
+    this.visibleMeshes.push(rightHandMesh);
 
-        // Normalize scaling to match 1.85m height
-        const hierarchyBounds = root.getHierarchyBoundingVectors();
-        const height = hierarchyBounds.max.y - hierarchyBounds.min.y;
-        if (height > 0.01) {
-          const scaleFactor = 1.85 / height;
-          root.scaling.scaleInPlace(scaleFactor);
-        }
+    // --- Legs (Left & Right) ---
+    // Left Leg
+    this.leftHipNode = new TransformNode('leftHip', scene);
+    this.leftHipNode.parent = this.hipsNode;
+    this.leftHipNode.position = new Vector3(-0.14, -0.1, 0);
 
-        // Hide procedural fallback meshes once real 3D model is loaded
-        this.visibleMeshes.forEach(m => {
-          m.setEnabled(false);
-        });
+    const leftThigh = MeshBuilder.CreateCylinder('leftThigh', { height: 0.42, diameter: 0.14 }, scene);
+    leftThigh.parent = this.leftHipNode;
+    leftThigh.position.y = -0.21;
+    leftThigh.material = armorMat;
+    this.visibleMeshes.push(leftThigh);
 
-        // Store and configure loaded meshes
-        result.meshes.forEach(mesh => {
-          if (mesh instanceof Mesh) {
-            this.glbMeshes.push(mesh);
-            mesh.checkCollisions = false;
-          }
-        });
+    this.leftKneeNode = new TransformNode('leftKnee', scene);
+    this.leftKneeNode.parent = this.leftHipNode;
+    this.leftKneeNode.position.y = -0.42;
 
-        // If animation groups exist, start idle animation
-        if (result.animationGroups && result.animationGroups.length > 0) {
-          const idleAnim = result.animationGroups.find(a => /idle/i.test(a.name)) || result.animationGroups[0];
-          idleAnim.start(true);
-        }
-      }
-    } catch (err) {
-      console.warn('[Player3D] Falling back to procedural 3D anime character rig:', err);
-    }
+    const leftShin = MeshBuilder.CreateCylinder('leftShin', { height: 0.42, diameter: 0.12 }, scene);
+    leftShin.parent = this.leftKneeNode;
+    leftShin.position.y = -0.21;
+    leftShin.material = circuitMat;
+    this.visibleMeshes.push(leftShin);
+
+    this.leftFootNode = new TransformNode('leftFoot', scene);
+    this.leftFootNode.parent = this.leftKneeNode;
+    this.leftFootNode.position = new Vector3(0, -0.42, 0.04);
+
+    const leftBoot = MeshBuilder.CreateBox('leftBoot', { width: 0.12, height: 0.09, depth: 0.22 }, scene);
+    leftBoot.parent = this.leftFootNode;
+    leftBoot.material = goldMat;
+    this.visibleMeshes.push(leftBoot);
+
+    // Right Leg
+    this.rightHipNode = new TransformNode('rightHip', scene);
+    this.rightHipNode.parent = this.hipsNode;
+    this.rightHipNode.position = new Vector3(0.14, -0.1, 0);
+
+    const rightThigh = MeshBuilder.CreateCylinder('rightThigh', { height: 0.42, diameter: 0.14 }, scene);
+    rightThigh.parent = this.rightHipNode;
+    rightThigh.position.y = -0.21;
+    rightThigh.material = armorMat;
+    this.visibleMeshes.push(rightThigh);
+
+    this.rightKneeNode = new TransformNode('rightKnee', scene);
+    this.rightKneeNode.parent = this.rightHipNode;
+    this.rightKneeNode.position.y = -0.42;
+
+    const rightShin = MeshBuilder.CreateCylinder('rightShin', { height: 0.42, diameter: 0.12 }, scene);
+    rightShin.parent = this.rightKneeNode;
+    rightShin.position.y = -0.21;
+    rightShin.material = circuitMat;
+    this.visibleMeshes.push(rightShin);
+
+    this.rightFootNode = new TransformNode('rightFoot', scene);
+    this.rightFootNode.parent = this.rightKneeNode;
+    this.rightFootNode.position = new Vector3(0, -0.42, 0.04);
+
+    const rightBoot = MeshBuilder.CreateBox('rightBoot', { width: 0.12, height: 0.09, depth: 0.22 }, scene);
+    rightBoot.parent = this.rightFootNode;
+    rightBoot.material = goldMat;
+    this.visibleMeshes.push(rightBoot);
   }
 
   private initInputs() {
@@ -283,7 +392,7 @@ export class Player3D {
       this.inputKeys[e.key.toLowerCase()] = true;
       if (e.key.toLowerCase() === 'j') this.triggerLightAttack();
       if (e.key.toLowerCase() === 'k') this.startChargingHeavy();
-      if (e.code === 'Space') this.triggerDodge();
+      if (e.code === 'Space') this.triggerJumpOrDodge();
       if (e.key.toLowerCase() === 'e') this.triggerWaveAbility();
       if (e.key.toLowerCase() === 'q') this.triggerUltimate();
     });
@@ -295,7 +404,6 @@ export class Player3D {
       }
     });
 
-    // Mouse combat triggers
     window.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.triggerLightAttack();
       if (e.button === 2) this.startChargingHeavy();
@@ -307,329 +415,58 @@ export class Player3D {
       }
     });
 
-    // Virtual mobile controls synchronization
-    GameBridge.on('virtual_input_change', (input: typeof GameBridge.virtualInput) => {
-      if (input.lightAttack) this.triggerLightAttack();
-      if (input.heavyAttack && !this.isChargingHeavy) this.startChargingHeavy();
-      if (!input.heavyAttack && this.isChargingHeavy) this.releaseHeavyAttack();
-      if (input.dodge) this.triggerDodge();
-      if (input.ability) this.triggerWaveAbility();
-      if (input.ultimate) this.triggerUltimate();
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Virtual Touch Controls
+    GameBridge.on('virtual_action', (action: string) => {
+      if (action === 'attack') this.triggerLightAttack();
+      if (action === 'heavy') this.triggerHeavyAttackInstant();
+      if (action === 'dodge') this.triggerJumpOrDodge();
+      if (action === 'wave') this.triggerWaveAbility();
+      if (action === 'ultimate') this.triggerUltimate();
     });
   }
 
   public update(delta: number) {
     if (this.isDead) return;
 
-    this.animTimer += delta * 0.001;
-    this.handleMovement(delta);
-    this.handleCombatTimers(delta);
-    this.updateSkeletalAnimation(delta);
-    this.emitStats();
-  }
+    const dt = delta / 1000;
+    this.idleTime += delta;
 
-  private handleMovement(delta: number) {
-    if (this.isAttacking || this.isDodging) return;
-
-    let moveX = 0;
-    let moveZ = 0;
-
-    // Desktop WASD
-    if (this.inputKeys['w'] || this.inputKeys['arrowup']) moveZ += 1;
-    if (this.inputKeys['s'] || this.inputKeys['arrowdown']) moveZ -= 1;
-    if (this.inputKeys['a'] || this.inputKeys['arrowleft']) moveX -= 1;
-    if (this.inputKeys['d'] || this.inputKeys['arrowright']) moveX += 1;
-
-    // Mobile Virtual Joystick
-    if (GameBridge.virtualInput.moveX !== 0 || GameBridge.virtualInput.moveY !== 0) {
-      moveX = GameBridge.virtualInput.moveX;
-      moveZ = -GameBridge.virtualInput.moveY;
+    // 1. Stamina & Cooldown Recovery
+    if (this.stamina < this.maxStamina && this.animState !== 'run' && !this.isDodging) {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 22 * dt);
+    }
+    if (this.abilityCooldown > 0) {
+      this.abilityCooldown = Math.max(0, this.abilityCooldown - delta);
     }
 
-    const isMoving = moveX !== 0 || moveZ !== 0;
-    const isSprinting = this.inputKeys['shift'] && isMoving && this.stamina > 10;
-
-    if (isSprinting) {
-      this.stamina = Math.max(0, this.stamina - delta * 0.02);
-    } else {
-      this.stamina = Math.min(this.maxStamina, this.stamina + delta * 0.035);
-    }
-
-    const targetSpeed = isMoving ? (isSprinting ? this.sprintSpeed : this.baseSpeed) : 0;
-    const accelRate = isMoving ? this.acceleration : this.deceleration;
-    this.speed = this.speed + (targetSpeed - this.speed) * Math.min(1, (accelRate * delta) / 1000);
-
-    if (isMoving) {
-      // Camera-relative direction calculation
-      const camForward = this.camera.getForwardVector();
-      const camRight = this.camera.getRightVector();
-
-      const moveDir = camForward.scale(moveZ).add(camRight.scale(moveX)).normalize();
-
-      // Smooth rotation toward move direction
-      const targetAngle = Math.atan2(moveDir.x, moveDir.z);
-      const currentAngle = this.rootMesh.rotation.y;
-      let diff = targetAngle - currentAngle;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      this.rootMesh.rotation.y += diff * 0.22;
-
-      // Apply movement velocity
-      const moveStep = moveDir.scale((this.speed * delta) / 1000);
-      moveStep.y = -9.81 * (delta / 1000) * 0.5; // Gravity
-      this.rootMesh.moveWithCollisions(moveStep);
-
-      this.animState = isSprinting ? 'sprint' : (this.speed > 3.0 ? 'run' : 'walk');
-
-      if (Math.random() < 0.035) {
-        this.soundManager.playFootstep();
+    // Sheath timer: return blade to scabbard if idle
+    if (this.weapon.isDrawn && !this.isAttacking && !this.isChargingHeavy) {
+      this.sheathTimer += delta;
+      if (this.sheathTimer > 1500) {
+        this.weapon.sheathWeapon();
       }
-    } else {
-      if (!this.isChargingHeavy) {
-        this.animState = 'idle';
-      }
-      // Apply gravity when idle
-      this.rootMesh.moveWithCollisions(new Vector3(0, -9.81 * (delta / 1000) * 0.5, 0));
     }
-  }
 
-  private handleCombatTimers(delta: number) {
-    if (this.comboResetTimer > 0) {
-      this.comboResetTimer -= delta;
-      if (this.comboResetTimer <= 0) {
+    // Combo timeout
+    if (this.comboIndex > 0) {
+      this.comboResetTimer += delta;
+      if (this.comboResetTimer > 1800) {
         this.comboIndex = 0;
       }
     }
 
-    if (this.attackTimer > 0) {
-      this.attackTimer -= delta;
-      if (this.attackTimer <= 0) {
-        this.isAttacking = false;
-        this.weapon.deactivateTrail();
-        this.animState = 'idle';
-      }
-    }
+    // 2. Physics: Ground Check & Vertical Gravity
+    this.handleGravity(dt);
 
-    if (this.abilityCooldown > 0) {
-      this.abilityCooldown = Math.max(0, this.abilityCooldown - delta);
-      GameBridge.emit('ability_cooldown', {
-        abilityId: 'wave',
-        current: this.abilityCooldown,
-        max: this.maxAbilityCooldown
-      });
-    }
-  }
+    // 3. Movement & Horizontal Input Handling
+    this.handleMovement(dt);
 
-  // Skeletal Animation Update
-  private updateSkeletalAnimation(delta: number) {
-    const t = this.animTimer * 10;
+    // 4. Update Skeletal Animation State Machine
+    this.updateSkeletalAnimation(delta, dt);
 
-    if (this.animState === 'idle') {
-      // Gentle breathing & robe swaying
-      this.hipsNode.position.y = 0.92 + Math.sin(t * 0.3) * 0.015;
-      this.leftArmNode.rotation.x = Math.sin(t * 0.3) * 0.08;
-      this.rightArmNode.rotation.x = -Math.sin(t * 0.3) * 0.08;
-      this.leftLegNode.rotation.x = 0;
-      this.rightLegNode.rotation.x = 0;
-    } else if (this.animState === 'walk' || this.animState === 'run' || this.animState === 'sprint') {
-      // Natural leg strides and arm swinging
-      const strideFreq = this.animState === 'sprint' ? 1.8 : 1.2;
-      const strideAmp = this.animState === 'sprint' ? 0.75 : (this.animState === 'run' ? 0.55 : 0.35);
-
-      this.leftLegNode.rotation.x = Math.sin(t * strideFreq) * strideAmp;
-      this.rightLegNode.rotation.x = -Math.sin(t * strideFreq) * strideAmp;
-
-      this.leftArmNode.rotation.x = -Math.sin(t * strideFreq) * strideAmp * 0.8;
-      this.rightArmNode.rotation.x = Math.sin(t * strideFreq) * strideAmp * 0.8;
-
-      this.spineNode.rotation.y = Math.sin(t * strideFreq) * 0.1;
-      this.chestNode.rotation.x = this.animState === 'sprint' ? 0.18 : 0.08; // Torso lean
-    } else if (this.animState === 'attack1') {
-      // Horizontal sweeping slash
-      this.rightArmNode.rotation.x = -Math.PI / 2.2;
-      this.rightArmNode.rotation.y = Math.sin(this.attackTimer * 0.03) * 1.6;
-      this.spineNode.rotation.y = -0.4;
-    } else if (this.animState === 'attack2') {
-      // High diagonal cross slash
-      this.rightArmNode.rotation.x = -Math.PI / 1.8;
-      this.rightArmNode.rotation.z = Math.cos(this.attackTimer * 0.03) * 1.4;
-      this.spineNode.rotation.y = 0.35;
-    } else if (this.animState === 'attack3') {
-      // Piercing forward thrust
-      this.rightArmNode.rotation.x = -Math.PI / 2;
-      this.rightArmNode.rotation.y = 0;
-      this.chestNode.rotation.x = 0.25;
-    } else if (this.animState === 'heavy_charge') {
-      // Two-handed overhead stance with blade vibration
-      this.rightArmNode.rotation.x = -Math.PI * 0.8;
-      this.rightArmNode.rotation.z = -0.2;
-      this.hipsNode.position.y = 0.82; // Slight knee crouch
-    } else if (this.animState === 'dodge') {
-      this.chestNode.rotation.x = 0.5;
-    }
-  }
-
-  // --- LIGHT ATTACK COMBO ---
-  public triggerLightAttack() {
-    if (this.isAttacking || this.isDodging || this.isDead) return;
-
-    this.isAttacking = true;
-    this.comboIndex = (this.comboIndex % 3) + 1;
-    this.animState = `attack${this.comboIndex}` as PlayerAnimState;
-    this.attackTimer = 280;
-    this.comboResetTimer = 1400;
-
-    this.soundManager.playSlash(this.comboIndex - 1);
-    this.weapon.activateTrail();
-
-    // Short forward lunge
-    const forward = this.getForwardVector();
-    this.rootMesh.moveWithCollisions(forward.scale(0.8));
-
-    // Dispatch 3D combat hit check event
-    (this.scene as any).combatManager?.resolvePlayerMeleeAttack({
-      origin: this.rootMesh.position,
-      direction: forward,
-      range: 2.8,
-      damage: 18 + this.comboIndex * 8,
-      poiseDamage: 20 + this.comboIndex * 6,
-      isHeavy: false
-    });
-  }
-
-  // --- CHARGED HEAVY ATTACK ---
-  public startChargingHeavy() {
-    if (this.isAttacking || this.isDodging || this.isDead) return;
-    this.isChargingHeavy = true;
-    this.animState = 'heavy_charge';
-    this.chargeTimer = 0;
-    this.soundManager.playCharge();
-  }
-
-  public releaseHeavyAttack() {
-    if (!this.isChargingHeavy || this.isDead) return;
-    this.isChargingHeavy = false;
-
-    this.isAttacking = true;
-    this.animState = 'attack3';
-    this.attackTimer = 420;
-
-    this.soundManager.playHeavyRelease();
-    this.camera.shake(0.35, 260);
-    this.weapon.activateTrail();
-
-    const forward = this.getForwardVector();
-    this.rootMesh.moveWithCollisions(forward.scale(1.4));
-
-    (this.scene as any).combatManager?.resolvePlayerMeleeAttack({
-      origin: this.rootMesh.position,
-      direction: forward,
-      range: 4.2,
-      damage: 65,
-      poiseDamage: 80,
-      isHeavy: true
-    });
-  }
-
-  // --- DODGE / DASH ---
-  public triggerDodge() {
-    if (this.isDodging || this.stamina < 22 || this.isDead) return;
-
-    this.isDodging = true;
-    this.isInvulnerable = true;
-    this.stamina -= 22;
-    this.animState = 'dodge';
-    this.soundManager.playDodge();
-
-    const forward = this.getForwardVector();
-    const dashDistance = 5.2;
-    this.rootMesh.moveWithCollisions(forward.scale(dashDistance));
-
-    window.setTimeout(() => {
-      this.isDodging = false;
-      this.isInvulnerable = false;
-      this.animState = 'idle';
-    }, 280);
-  }
-
-  // --- TRANSMUTATION WAVE (E) ---
-  public triggerWaveAbility() {
-    if (!this.waveAbilityUnlocked || this.abilityCooldown > 0 || this.isDead) return;
-
-    this.abilityCooldown = this.maxAbilityCooldown;
-    this.soundManager.playAbilityWave();
-    this.camera.shake(0.4, 250);
-
-    const forward = this.getForwardVector();
-    (this.scene as any).combatManager?.spawnTransmutationWave(this.rootMesh.position, forward);
-  }
-
-  // --- CELESTIAL RESONANCE ULTIMATE (Q) ---
-  public triggerUltimate() {
-    if (!this.ultimateUnlocked || this.ultimate < this.maxUltimate || this.isDead) return;
-
-    this.ultimate = 0;
-    this.isInvulnerable = true;
-    this.soundManager.playUltimateFinisher();
-    this.camera.shake(0.65, 800);
-
-    (this.scene as any).combatManager?.triggerCelestialResonance(this.rootMesh.position);
-
-    window.setTimeout(() => {
-      this.isInvulnerable = false;
-    }, 1200);
-  }
-
-  public addUltimateCharge(amount: number) {
-    if (!this.ultimateUnlocked) return;
-    this.ultimate = Math.min(this.maxUltimate, this.ultimate + amount);
-  }
-
-  public takeDamage(amount: number) {
-    if (this.isInvulnerable || this.isDead) return;
-
-    this.hp = Math.max(0, this.hp - amount);
-    this.soundManager.playHit(false);
-    this.camera.shake(0.3, 200);
-    this.animState = 'hurt';
-
-    window.setTimeout(() => {
-      if (!this.isDead && this.animState === 'hurt') {
-        this.animState = 'idle';
-      }
-    }, 200);
-
-    if (this.hp <= 0) {
-      this.die();
-    }
-  }
-
-  public die() {
-    this.isDead = true;
-    this.animState = 'death';
-    GameBridge.emit('player_death');
-  }
-
-  public unlockWaveAbility() {
-    this.waveAbilityUnlocked = true;
-    const p = loadProgress();
-    p.unlockedWaveAbility = true;
-    saveProgress(p);
-  }
-
-  public unlockUltimate() {
-    this.ultimateUnlocked = true;
-    const p = loadProgress();
-    p.unlockedUltimate = true;
-    saveProgress(p);
-  }
-
-  public getForwardVector(): Vector3 {
-    const angle = this.rootMesh.rotation.y;
-    return new Vector3(Math.sin(angle), 0, Math.cos(angle)).normalize();
-  }
-
-  private emitStats() {
+    // 5. Publish Stats to React HUD
     GameBridge.emit('player_stats', {
       hp: this.hp,
       maxHp: this.maxHp,
@@ -641,8 +478,431 @@ export class Player3D {
     });
   }
 
-  public dispose() {
-    this.weapon.dispose();
-    this.rootMesh.dispose();
+  private handleGravity(dt: number) {
+    // Raycast down to find ground
+    const ray = new Ray(this.rootMesh.position.add(new Vector3(0, 0.5, 0)), Vector3.Down(), 1.6);
+    const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m !== this.rootMesh);
+
+    if (hit && hit.hit && hit.pickedPoint) {
+      const targetY = hit.pickedPoint.y;
+      if (this.rootMesh.position.y <= targetY + 0.1 && this.verticalVelocity <= 0) {
+        this.rootMesh.position.y = targetY;
+        this.verticalVelocity = 0;
+
+        if (!this.isGrounded) {
+          // Landing impact
+          this.isGrounded = true;
+          if (this.animState === 'airborne') {
+            this.animState = 'land';
+            this.stateTimer = 160;
+            this.soundManager.playFootstep();
+          }
+        }
+      } else {
+        this.isGrounded = false;
+      }
+    } else {
+      this.isGrounded = false;
+    }
+
+    if (!this.isGrounded) {
+      this.verticalVelocity += this.gravity * dt;
+      this.rootMesh.position.y += this.verticalVelocity * dt;
+      if (this.animState !== 'attack1' && this.animState !== 'attack2' && this.animState !== 'attack3') {
+        this.animState = 'airborne';
+      }
+    }
+  }
+
+  private handleMovement(dt: number) {
+    if (this.isDead) return;
+
+    // Movement lock during heavy attack or jump start
+    if (this.animState === 'jump_start' || this.isChargingHeavy) {
+      return;
+    }
+
+    // Read WASD & Virtual Stick
+    let inputX = 0;
+    let inputZ = 0;
+
+    if (this.inputKeys['w'] || this.inputKeys['arrowup']) inputZ += 1;
+    if (this.inputKeys['s'] || this.inputKeys['arrowdown']) inputZ -= 1;
+    if (this.inputKeys['a'] || this.inputKeys['arrowleft']) inputX -= 1;
+    if (this.inputKeys['d'] || this.inputKeys['arrowright']) inputX += 1;
+
+    const vInput = GameBridge.virtualInput;
+    if (Math.abs(vInput.moveX) > 0.1 || Math.abs(vInput.moveY) > 0.1) {
+      inputX = vInput.moveX;
+      inputZ = -vInput.moveY;
+    }
+
+    const inputMag = Math.sqrt(inputX * inputX + inputZ * inputZ);
+
+    if (inputMag > 0.05 && (!this.isAttacking || !this.isGrounded)) {
+      // Normalize and project relative to Camera Forward
+      const normX = inputX / Math.max(1, inputMag);
+      const normZ = inputZ / Math.max(1, inputMag);
+
+      const camForward = this.camera.getForwardVector();
+      const camRight = this.camera.getRightVector();
+
+      const moveDir = camForward.scale(normZ).add(camRight.scale(normX)).normalize();
+
+      // Smooth Slerp Heading Rotation (fluid turning without snaps)
+      const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+      let diff = targetAngle - this.currentHeading;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      this.currentHeading += diff * Math.min(1.0, 14.0 * dt);
+      this.rootMesh.rotation.y = this.currentHeading;
+
+      // Speed calculation
+      let currentSpeed = this.baseSpeed;
+      if (this.isDodging) currentSpeed *= 1.8;
+      if (this.isAttacking) currentSpeed *= 0.3;
+
+      const displacement = moveDir.scale(currentSpeed * dt);
+      this.rootMesh.moveWithCollisions(displacement);
+
+      if (this.isGrounded && !this.isAttacking && !this.isDodging && this.animState !== 'land') {
+        this.animState = 'run';
+      }
+    } else {
+      if (this.isGrounded && !this.isAttacking && !this.isDodging && this.animState !== 'land') {
+        this.animState = 'idle';
+      }
+    }
+  }
+
+  private updateSkeletalAnimation(delta: number, dt: number) {
+    if (this.isDead) return;
+
+    if (this.stateTimer > 0) {
+      this.stateTimer -= delta;
+      if (this.stateTimer <= 0) {
+        if (this.animState === 'land' || this.animState === 'dodge' || this.animState.startsWith('attack')) {
+          this.isAttacking = false;
+          this.isDodging = false;
+          this.isInvulnerable = false;
+          this.animState = 'idle';
+        }
+      }
+    }
+
+    // --- State-Specific Joint Calculations ---
+    switch (this.animState) {
+      case 'idle': {
+        // Natural chest breathing
+        const breath = Math.sin(this.idleTime * 0.0022);
+        this.spineNode.rotation.x = breath * 0.025;
+        this.chestNode.position.y = 0.22 + breath * 0.012;
+        this.headNode.rotation.x = -breath * 0.015;
+
+        // Arms rest naturally; left hand near katana hilt
+        this.leftShoulderNode.rotation = new Vector3(0.08, 0.1, 0.18);
+        this.leftElbowNode.rotation.x = 0.35;
+        this.rightShoulderNode.rotation = new Vector3(0.06, -0.05, -0.15);
+        this.rightElbowNode.rotation.x = 0.15;
+
+        // Legs planted solidly
+        this.leftHipNode.rotation = new Vector3(0, 0, -0.05);
+        this.leftKneeNode.rotation.x = 0.04;
+        this.rightHipNode.rotation = new Vector3(0, 0, 0.05);
+        this.rightKneeNode.rotation.x = 0.04;
+        this.hipsNode.position.y = 0.92;
+        break;
+      }
+
+      case 'run': {
+        // Stride phase driven by velocity
+        this.stridePhase += dt * 11.5;
+        const stride = Math.sin(this.stridePhase);
+
+        // Torso forward lean into momentum + vertical stride bounce
+        this.spineNode.rotation.x = 0.18;
+        this.hipsNode.position.y = 0.92 + Math.abs(Math.sin(this.stridePhase)) * 0.07;
+
+        // Alternating leg movement with knee flex
+        this.leftHipNode.rotation.x = stride * 0.72;
+        this.leftKneeNode.rotation.x = Math.max(0, -stride * 0.85);
+        this.rightHipNode.rotation.x = -stride * 0.72;
+        this.rightKneeNode.rotation.x = Math.max(0, stride * 0.85);
+
+        // Counter-swinging arms
+        if (!this.weapon.isDrawn) {
+          // Left hand stabilizes sheath while right arm swings
+          this.leftShoulderNode.rotation = new Vector3(0.12, 0.15, 0.12);
+          this.leftElbowNode.rotation.x = 0.45;
+          this.rightShoulderNode.rotation.x = -stride * 0.55;
+          this.rightElbowNode.rotation.x = 0.35;
+        } else {
+          // Two-hand ready run
+          this.rightShoulderNode.rotation = new Vector3(0.4, 0.2, 0);
+          this.rightElbowNode.rotation.x = 0.6;
+        }
+
+        // Footstep audio trigger on strike
+        if (Math.abs(stride) > 0.94) {
+          this.soundManager.playFootstep();
+        }
+        break;
+      }
+
+      case 'jump_start': {
+        // Anticipation squat before launch
+        this.hipsNode.position.y = 0.78;
+        this.leftKneeNode.rotation.x = 0.65;
+        this.rightKneeNode.rotation.x = 0.65;
+        this.spineNode.rotation.x = 0.25;
+        this.leftShoulderNode.rotation.x = -0.4;
+        this.rightShoulderNode.rotation.x = -0.4;
+        break;
+      }
+
+      case 'airborne': {
+        // Airborne dynamic pose
+        this.hipsNode.position.y = 0.94;
+        this.leftHipNode.rotation.x = 0.35;
+        this.leftKneeNode.rotation.x = 0.75;
+        this.rightHipNode.rotation.x = -0.25;
+        this.rightKneeNode.rotation.x = 0.45;
+        this.leftShoulderNode.rotation = new Vector3(-0.35, 0, 0.4);
+        this.rightShoulderNode.rotation = new Vector3(-0.35, 0, -0.4);
+        break;
+      }
+
+      case 'land': {
+        // Impact absorption
+        this.hipsNode.position.y = 0.82;
+        this.leftKneeNode.rotation.x = 0.45;
+        this.rightKneeNode.rotation.x = 0.45;
+        this.spineNode.rotation.x = 0.15;
+        break;
+      }
+
+      case 'attack1': {
+        // Horizontal Slash Arc
+        const progress = 1 - this.stateTimer / 320;
+        const swing = Math.sin(progress * Math.PI);
+        this.spineNode.rotation.y = (progress - 0.5) * 1.8;
+        this.rightShoulderNode.rotation = new Vector3(0.2, -1.2 + progress * 2.4, -0.2);
+        this.rightElbowNode.rotation.x = 0.3 + swing * 0.4;
+        if (progress > 0.42 && !this.hasCheckedHitThisAttack) {
+          this.hasCheckedHitThisAttack = true;
+          this.onAttackHitCheck?.(false, 28);
+        }
+        break;
+      }
+
+      case 'attack2': {
+        // Diagonal Rising Slash
+        const progress = 1 - this.stateTimer / 340;
+        const swing = Math.sin(progress * Math.PI);
+        this.spineNode.rotation.x = -0.15 + swing * 0.25;
+        this.spineNode.rotation.y = (0.5 - progress) * 1.6;
+        this.rightShoulderNode.rotation = new Vector3(1.2 - progress * 2.2, 0.4, -0.4);
+        this.rightElbowNode.rotation.x = 0.4 + swing * 0.5;
+        if (progress > 0.42 && !this.hasCheckedHitThisAttack) {
+          this.hasCheckedHitThisAttack = true;
+          this.onAttackHitCheck?.(false, 34);
+        }
+        break;
+      }
+
+      case 'attack3': {
+        // Overhead Helm-Breaker
+        const progress = 1 - this.stateTimer / 440;
+        if (progress < 0.35) {
+          // Anticipation lift
+          this.rightShoulderNode.rotation = new Vector3(-1.6, 0.1, 0);
+          this.rightElbowNode.rotation.x = 0.8;
+          this.spineNode.rotation.x = -0.2;
+        } else {
+          // Downward slam
+          this.rightShoulderNode.rotation = new Vector3(1.4, 0, 0);
+          this.rightElbowNode.rotation.x = 0.2;
+          this.spineNode.rotation.x = 0.35;
+          this.hipsNode.position.y = 0.82;
+          if (!this.hasCheckedHitThisAttack) {
+            this.hasCheckedHitThisAttack = true;
+            this.onAttackHitCheck?.(true, 56);
+          }
+        }
+        break;
+      }
+
+      case 'heavy_charge': {
+        // Low Battou/Iai Stance
+        this.hipsNode.position.y = 0.82;
+        this.leftHipNode.rotation.x = -0.45;
+        this.rightHipNode.rotation.x = 0.45;
+        this.leftKneeNode.rotation.x = 0.75;
+        this.rightKneeNode.rotation.x = 0.65;
+        this.spineNode.rotation.y = 0.55;
+        // Right hand ready at hilt
+        this.rightShoulderNode.rotation = new Vector3(0.65, -0.6, 0);
+        this.rightElbowNode.rotation.x = 0.95;
+        break;
+      }
+
+      case 'dodge': {
+        // Acrobatic Evade Dash
+        this.spineNode.rotation.x = 0.45;
+        this.hipsNode.position.y = 0.76;
+        this.leftKneeNode.rotation.x = 0.55;
+        this.rightKneeNode.rotation.x = 0.55;
+        break;
+      }
+    }
+  }
+
+  // --- Combat Action Triggers ---
+  public triggerLightAttack() {
+    if (this.isDead || this.isDodging) return;
+
+    this.sheathTimer = 0;
+    this.hasCheckedHitThisAttack = false;
+    this.weapon.drawWeapon();
+
+    this.isAttacking = true;
+    this.comboIndex = (this.comboIndex % 3) + 1;
+    this.comboResetTimer = 0;
+
+    if (this.comboIndex === 1) {
+      this.animState = 'attack1';
+      this.stateTimer = 320;
+    } else if (this.comboIndex === 2) {
+      this.animState = 'attack2';
+      this.stateTimer = 340;
+    } else {
+      this.animState = 'attack3';
+      this.stateTimer = 440;
+    }
+
+    this.soundManager.playSlash(this.comboIndex);
+    this.camera.shake(0.12, 120);
+
+    // Forward combat momentum step
+    const forward = this.rootMesh.forward.clone().normalize();
+    this.rootMesh.moveWithCollisions(forward.scale(0.85));
+  }
+
+  public startChargingHeavy() {
+    if (this.isDead || this.isDodging) return;
+    this.isChargingHeavy = true;
+    this.animState = 'heavy_charge';
+    this.soundManager.playCharge();
+  }
+
+  public releaseHeavyAttack() {
+    if (!this.isChargingHeavy) return;
+    this.isChargingHeavy = false;
+    this.triggerHeavyAttackInstant();
+  }
+
+  public triggerHeavyAttackInstant() {
+    this.sheathTimer = 0;
+    this.hasCheckedHitThisAttack = false;
+    this.weapon.drawWeapon();
+
+    this.isAttacking = true;
+    this.animState = 'attack3';
+    this.stateTimer = 460;
+    this.soundManager.playHeavyRelease();
+    this.camera.shake(0.35, 240);
+
+    const forward = this.rootMesh.forward.clone().normalize();
+    this.rootMesh.moveWithCollisions(forward.scale(1.8));
+  }
+
+  public triggerJumpOrDodge() {
+    if (this.isDead) return;
+
+    if (this.isGrounded && this.animState !== 'jump_start' && this.animState !== 'airborne') {
+      if (this.stamina >= 20) {
+        this.stamina -= 20;
+        this.animState = 'jump_start';
+        this.stateTimer = 110;
+        this.soundManager.playDodge();
+
+        setTimeout(() => {
+          if (this.animState === 'jump_start') {
+            this.isGrounded = false;
+            this.verticalVelocity = this.jumpPower;
+            this.animState = 'airborne';
+          }
+        }, 100);
+      }
+    } else if (!this.isDodging && this.stamina >= 25) {
+      // Air dodge / dash
+      this.stamina -= 25;
+      this.isDodging = true;
+      this.isInvulnerable = true;
+      this.animState = 'dodge';
+      this.stateTimer = 280;
+      this.soundManager.playDodge();
+    }
+  }
+
+  public triggerWaveAbility() {
+    if (this.isDead || this.abilityCooldown > 0) return;
+    this.abilityCooldown = this.maxAbilityCooldown;
+    this.triggerHeavyAttackInstant();
+    this.soundManager.playAbilityWave();
+    GameBridge.emit('toast_message', {
+      title: '✦ TRANSMUTATION WAVE RELEASED',
+      subtitle: 'Energy resonance cleared surrounding entities',
+      type: 'info'
+    });
+  }
+
+  public triggerUltimate() {
+    if (this.isDead || this.ultimate < this.maxUltimate) return;
+    this.ultimate = 0;
+    this.triggerHeavyAttackInstant();
+    this.camera.shake(0.5, 450);
+    this.soundManager.playHeavyRelease();
+    GameBridge.emit('toast_message', {
+      title: '✦ CELESTIAL RESONANCE UNLEASHED',
+      subtitle: 'Maximum harmonic frequency activated',
+      type: 'info'
+    });
+  }
+
+  public takeDamage(amount: number) {
+    if (this.isDead || this.isInvulnerable) return;
+
+    this.hp = Math.max(0, this.hp - amount);
+    this.soundManager.playHit(false);
+    this.camera.shake(0.28, 220);
+
+    if (this.hp <= 0) {
+      this.isDead = true;
+      this.animState = 'death';
+      GameBridge.emit('player_death');
+    }
+  }
+
+  public unlockWaveAbility() {
+    this.waveAbilityUnlocked = true;
+  }
+
+  public unlockUltimate() {
+    this.ultimateUnlocked = true;
+  }
+
+  public addUltimateCharge(amount: number) {
+    this.ultimate = Math.min(this.maxUltimate, this.ultimate + amount);
+  }
+
+  public restart() {
+    this.hp = this.maxHp;
+    this.stamina = this.maxStamina;
+    this.isDead = false;
+    this.isAttacking = false;
+    this.isDodging = false;
+    this.animState = 'idle';
+    this.weapon.sheathWeapon();
   }
 }

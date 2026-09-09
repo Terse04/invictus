@@ -10,10 +10,9 @@ export class ThirdPersonCamera {
   private targetMesh: { position: Vector3 };
 
   // Damping and distance tuning
-  public idealDistance = 7.5;
-  public idealHeight = 2.4;
-  private currentDistance = 7.5;
-  private targetOffset = new Vector3(0, 1.4, 0);
+  public idealDistance = 4.8; // Character occupies ~25-30% of screen height
+  public idealBeta = Math.PI / 2.35;
+  private targetOffset = new Vector3(0.35, 1.35, 0); // Over-the-shoulder action framing
 
   // Shake state
   private isShaking = false;
@@ -24,39 +23,41 @@ export class ThirdPersonCamera {
     this.scene = scene;
     this.targetMesh = targetMesh;
 
-    // ArcRotateCamera positioned behind target
+    // Action Third-Person ArcRotateCamera
     this.camera = new ArcRotateCamera(
-      'thirdPersonCamera',
-      -Math.PI / 2, // alpha (horizontal rotation)
-      Math.PI / 2.6, // beta (vertical pitch)
-      this.idealDistance, // radius
+      'actionCamera',
+      -Math.PI / 2, // alpha (facing forward)
+      this.idealBeta, // beta (slight downward pitch)
+      this.idealDistance,
       targetMesh.position.add(this.targetOffset),
       scene
     );
 
-    this.camera.lowerRadiusLimit = 3.0;
-    this.camera.upperRadiusLimit = 14.0;
-    this.camera.lowerBetaLimit = 0.2;
-    this.camera.upperBetaLimit = Math.PI / 2 - 0.05; // Prevent camera going underground
-    this.camera.wheelPrecision = 40;
-    this.camera.angularSensibilityX = 1600;
-    this.camera.angularSensibilityY = 1600;
+    // Tight action limits
+    this.camera.lowerRadiusLimit = 2.8;
+    this.camera.upperRadiusLimit = 7.5;
+    this.camera.lowerBetaLimit = 0.35;
+    this.camera.upperBetaLimit = Math.PI / 2 - 0.08; // Prevent going through floor
+    this.camera.fov = 0.84; // ~48 deg cinematic action FOV
+    this.camera.wheelPrecision = 35;
+    this.camera.angularSensibilityX = 1400;
+    this.camera.angularSensibilityY = 1400;
 
     // Attach mouse controls
     this.camera.attachControl(canvas, true);
 
-    // Damping / inertia
-    this.camera.inertia = 0.75;
+    // Smooth inertia
+    this.camera.inertia = 0.68;
   }
 
   public update(delta: number) {
     if (!this.targetMesh) return;
 
-    // Smoothly follow target position + offset
+    // Smoothly follow target position with slight lag
     const desiredTarget = this.targetMesh.position.add(this.targetOffset);
-    Vector3.LerpToRef(this.camera.target, desiredTarget, 0.15, this.camera.target);
+    Vector3.LerpToRef(this.camera.target, desiredTarget, 0.18, this.camera.target);
 
-    // Handle screen shake
+    // Handle screen shake on weapon impacts and abilities
     if (this.isShaking) {
       this.shakeTimer -= delta;
       if (this.shakeTimer <= 0) {
@@ -70,7 +71,7 @@ export class ThirdPersonCamera {
     }
   }
 
-  public shake(intensity: number = 0.25, duration: number = 220) {
+  public shake(intensity: number = 0.18, duration: number = 180) {
     this.isShaking = true;
     this.shakeIntensity = intensity;
     this.shakeTimer = duration;
@@ -78,15 +79,13 @@ export class ThirdPersonCamera {
 
   public rotateBy(deltaAlpha: number, deltaBeta: number) {
     this.camera.alpha += deltaAlpha;
-    this.camera.beta = Math.max(this.camera.lowerBetaLimit!, Math.min(this.camera.upperBetaLimit!, this.camera.beta + deltaBeta));
-  }
-
-  public setZoom(radius: number) {
-    this.camera.radius = radius;
+    this.camera.beta = Math.max(
+      this.camera.lowerBetaLimit!,
+      Math.min(this.camera.upperBetaLimit!, this.camera.beta + deltaBeta)
+    );
   }
 
   public getForwardVector(): Vector3 {
-    // Return horizontal forward vector of camera
     const alpha = this.camera.alpha;
     return new Vector3(Math.cos(alpha + Math.PI / 2), 0, Math.sin(alpha + Math.PI / 2)).normalize();
   }

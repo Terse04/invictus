@@ -61,6 +61,19 @@ export class Game3D {
     // 5. 3D Combat Manager
     this.combatManager = new CombatManager3D(this.engine.scene, this.player, this.particles);
 
+    // Frame-accurate spatial katana attack callback
+    this.player.onAttackHitCheck = (isHeavy: boolean, damage: number) => {
+      const forward = this.player.rootMesh.forward.clone().normalize();
+      this.combatManager.resolvePlayerMeleeAttack({
+        origin: this.player.rootMesh.position.add(new Vector3(0, 0.9, 0)),
+        direction: forward,
+        range: isHeavy ? 3.8 : 2.8,
+        damage,
+        poiseDamage: isHeavy ? 45 : 20,
+        isHeavy
+      });
+    };
+
     // 6. 3D Elder Yan NPC in Zone 2
     this.elderYan = new ElderYan3D(this.engine.scene, new Vector3(0, 0, 35), this.player);
 

@@ -47,27 +47,32 @@ export class GameEngine {
     });
 
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.04, 0.07, 0.12, 1.0); // Deep celestial indigo
+    this.scene.clearColor = new Color4(0.03, 0.05, 0.09, 1.0); // Deep celestial midnight indigo
 
-    // Atmospheric 3D Exponential Fog
+    // Atmospheric 3D Exponential Fog for cinematic spatial depth
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.0055;
-    this.scene.fogColor = new Color3(0.04, 0.07, 0.12);
+    this.scene.fogDensity = 0.0072;
+    this.scene.fogColor = new Color3(0.03, 0.05, 0.09);
 
     // Collisions setup
     this.scene.collisionsEnabled = true;
 
-    // Ambient Celestial Hemispheric Light
+    // Ambient Celestial Hemispheric Light (Cool midnight blue ambient)
     this.hemiLight = new HemisphericLight('hemiLight', new Vector3(0, 1, 0), this.scene);
-    this.hemiLight.intensity = 0.65;
-    this.hemiLight.diffuse = new Color3(0.85, 0.95, 1.0);
-    this.hemiLight.groundColor = new Color3(0.12, 0.16, 0.22);
+    this.hemiLight.intensity = 0.55;
+    this.hemiLight.diffuse = new Color3(0.45, 0.65, 0.92);
+    this.hemiLight.groundColor = new Color3(0.08, 0.12, 0.18);
 
-    // Key Directional Sunlight for dramatic shadows
-    this.dirLight = new DirectionalLight('dirLight', new Vector3(-0.6, -1.2, 0.8), this.scene);
-    this.dirLight.position = new Vector3(30, 60, -30);
-    this.dirLight.intensity = 1.6;
-    this.dirLight.diffuse = new Color3(1.0, 0.96, 0.88);
+    // Key Directional Moonlight (Crisp silvery light casting sharp shadows)
+    this.dirLight = new DirectionalLight('dirLight', new Vector3(-0.5, -1.4, 0.8), this.scene);
+    this.dirLight.position = new Vector3(35, 75, -35);
+    this.dirLight.intensity = 1.9;
+    this.dirLight.diffuse = new Color3(0.92, 0.96, 1.0);
+
+    // Dynamic Rim Light (Illuminates silhouette edges from behind)
+    const rimLight = new DirectionalLight('rimLight', new Vector3(0.5, 0.6, -1.0), this.scene);
+    rimLight.intensity = 0.85;
+    rimLight.diffuse = new Color3(0.15, 0.75, 1.0);
 
     // Dynamic Shadow Generator
     this.shadowGenerator = new ShadowGenerator(2048, this.dirLight);

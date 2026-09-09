@@ -12,76 +12,150 @@ import {
 export class Weapon3D {
   public rootNode: TransformNode;
   public bladeMesh: Mesh;
-  public hiltMesh: Mesh;
   public guardMesh: Mesh;
+  public hiltMesh: Mesh;
+  public pommelMesh: Mesh;
+  public sayaMesh: Mesh; // Scabbard permanently at hip
   public tipNode: TransformNode;
   public trailMesh: TrailMesh | null = null;
+
+  public isDrawn = false;
   private scene: Scene;
+  private handNode: TransformNode;
+  private sheathNode: TransformNode;
 
-  constructor(scene: Scene, parentNode: TransformNode) {
+  constructor(scene: Scene, handNode: TransformNode, sheathNode: TransformNode) {
     this.scene = scene;
-    this.rootNode = new TransformNode('weaponRoot', scene);
-    this.rootNode.parent = parentNode;
+    this.handNode = handNode;
+    this.sheathNode = sheathNode;
 
-    // Relative transform to right hand
-    this.rootNode.position = new Vector3(0.08, -0.05, 0.15);
-    this.rootNode.rotation = new Vector3(Math.PI / 2, 0, 0);
+    // 1. Scabbard (Saya) - permanently attached to left hip sheath node
+    this.sayaMesh = MeshBuilder.CreateBox('sayaMesh', {
+      width: 0.05,
+      height: 1.05,
+      depth: 0.03
+    }, scene);
+    this.sayaMesh.parent = sheathNode;
+    this.sayaMesh.position = new Vector3(0, -0.42, 0);
 
-    // 1. Blade: Slender Chinese Jian (Double-edged straight blade with cyan quantum core)
-    this.bladeMesh = MeshBuilder.CreateBox('jianBlade', {
-      width: 0.07,
-      height: 1.15,
-      depth: 0.02
+    const sayaMat = new StandardMaterial('sayaMat', scene);
+    sayaMat.diffuseColor = new Color3(0.04, 0.06, 0.10); // Lacquered obsidian
+    sayaMat.specularColor = new Color3(0.5, 0.7, 0.9);
+    sayaMat.emissiveColor = new Color3(0.0, 0.15, 0.25); // Subtle cyan circuit trim
+    this.sayaMesh.material = sayaMat;
+
+    // Gold Sageo band on scabbard
+    const bandMesh = MeshBuilder.CreateBox('sayaBand', {
+      width: 0.06,
+      height: 0.12,
+      depth: 0.04
+    }, scene);
+    bandMesh.parent = this.sayaMesh;
+    bandMesh.position.y = 0.35;
+    const goldMat = new StandardMaterial('goldTrimMat', scene);
+    goldMat.diffuseColor = new Color3(0.95, 0.75, 0.2);
+    goldMat.emissiveColor = new Color3(0.4, 0.3, 0.05);
+    bandMesh.material = goldMat;
+
+    // 2. Weapon Root Node (holds the actual Katana: blade + guard + hilt)
+    this.rootNode = new TransformNode('katanaRoot', scene);
+
+    // 3. Cyber-Katana Blade (Curved, slender, razor-sharp edge)
+    this.bladeMesh = MeshBuilder.CreateBox('katanaBlade', {
+      width: 0.04,
+      height: 1.1,
+      depth: 0.015
     }, scene);
     this.bladeMesh.parent = this.rootNode;
-    this.bladeMesh.position.y = 0.65;
+    this.bladeMesh.position.y = 0.58;
 
-    // Cyber-Quantum Blade Material (Luminous cyan glow)
-    const bladeMat = new StandardMaterial('bladeMat', scene);
-    bladeMat.diffuseColor = new Color3(0.9, 0.98, 1.0);
-    bladeMat.emissiveColor = new Color3(0.0, 0.85, 1.0); // Cyan energy core
+    const bladeMat = new StandardMaterial('katanaBladeMat', scene);
+    bladeMat.diffuseColor = new Color3(0.9, 0.95, 1.0);
     bladeMat.specularColor = new Color3(1, 1, 1);
-    bladeMat.specularPower = 64;
+    bladeMat.emissiveColor = new Color3(0.0, 0.85, 1.0); // Cyan quantum plasma edge
+    bladeMat.specularPower = 128;
     this.bladeMesh.material = bladeMat;
 
-    // 2. Guard: Ancient Chinese Winged Crossguard (Imperial Gold)
-    this.guardMesh = MeshBuilder.CreateBox('jianGuard', {
-      width: 0.26,
-      height: 0.04,
-      depth: 0.05
+    // Glowing plasma fuller (energy canal along spine)
+    const fuller = MeshBuilder.CreateBox('bladeFuller', {
+      width: 0.012,
+      height: 0.95,
+      depth: 0.02
+    }, scene);
+    fuller.parent = this.bladeMesh;
+    const fullerMat = new StandardMaterial('fullerMat', scene);
+    fullerMat.emissiveColor = new Color3(0.3, 0.95, 1.0);
+    fuller.material = fullerMat;
+
+    // 4. Tsuba (Crossguard) - Ancient geometric octagonal plate
+    this.guardMesh = MeshBuilder.CreateCylinder('tsuba', {
+      height: 0.025,
+      diameter: 0.18,
+      tessellation: 8
     }, scene);
     this.guardMesh.parent = this.rootNode;
-    this.guardMesh.position.y = 0.08;
-
-    const goldMat = new StandardMaterial('goldGuardMat', scene);
-    goldMat.diffuseColor = new Color3(0.85, 0.65, 0.15);
-    goldMat.emissiveColor = new Color3(0.35, 0.25, 0.05);
+    this.guardMesh.position.y = 0.02;
     this.guardMesh.material = goldMat;
 
-    // 3. Hilt & Pommel: Cyber-woven grip & obsidian counterweight
-    this.hiltMesh = MeshBuilder.CreateCylinder('jianHilt', {
-      height: 0.22,
-      diameter: 0.038
+    // 5. Tsuka (Hilt) - Diamond-braided cyber wrap
+    this.hiltMesh = MeshBuilder.CreateCylinder('tsuka', {
+      height: 0.28,
+      diameter: 0.035
     }, scene);
     this.hiltMesh.parent = this.rootNode;
-    this.hiltMesh.position.y = -0.06;
+    this.hiltMesh.position.y = -0.14;
 
-    const hiltMat = new StandardMaterial('hiltMat', scene);
-    hiltMat.diffuseColor = new Color3(0.08, 0.12, 0.18);
+    const hiltMat = new StandardMaterial('tsukaMat', scene);
+    hiltMat.diffuseColor = new Color3(0.06, 0.08, 0.12);
     this.hiltMesh.material = hiltMat;
 
-    // Tip node for slash trail tracking
-    this.tipNode = new TransformNode('weaponTip', scene);
+    // 6. Kashira (Pommel)
+    this.pommelMesh = MeshBuilder.CreateSphere('kashira', {
+      diameter: 0.048
+    }, scene);
+    this.pommelMesh.parent = this.rootNode;
+    this.pommelMesh.position.y = -0.28;
+    this.pommelMesh.material = goldMat;
+
+    // 7. Slash trail tracking node at blade tip
+    this.tipNode = new TransformNode('katanaTip', scene);
     this.tipNode.parent = this.bladeMesh;
-    this.tipNode.position.y = 0.6;
+    this.tipNode.position.y = 0.55;
+
+    // Start sheathed
+    this.sheathWeapon();
+  }
+
+  public drawWeapon() {
+    if (this.isDrawn) return;
+    this.isDrawn = true;
+
+    // Re-parent to right hand
+    this.rootNode.parent = this.handNode;
+    // Precise ergonomic katana grip alignment in hand
+    this.rootNode.position = new Vector3(0, -0.05, 0.08);
+    this.rootNode.rotation = new Vector3(Math.PI / 2.2, 0, 0);
+
+    this.activateTrail();
+  }
+
+  public sheathWeapon() {
+    this.isDrawn = false;
+    this.deactivateTrail();
+
+    // Re-parent to hip sheath node
+    this.rootNode.parent = this.sheathNode;
+    // Align hilt directly above the scabbard opening
+    this.rootNode.position = new Vector3(0, 0.08, 0);
+    this.rootNode.rotation = new Vector3(0, 0, 0);
   }
 
   public activateTrail() {
     if (!this.trailMesh) {
-      this.trailMesh = new TrailMesh('weaponTrail', this.bladeMesh, this.scene, 0.35, 18, true);
+      this.trailMesh = new TrailMesh('weaponTrail', this.bladeMesh, this.scene, 0.45, 24, true);
       const trailMat = new StandardMaterial('trailMat', this.scene);
       trailMat.emissiveColor = new Color3(0.0, 0.95, 1.0);
-      trailMat.alpha = 0.7;
+      trailMat.alpha = 0.75;
       this.trailMesh.material = trailMat;
     }
   }
@@ -102,6 +176,8 @@ export class Weapon3D {
     this.bladeMesh.dispose();
     this.guardMesh.dispose();
     this.hiltMesh.dispose();
+    this.pommelMesh.dispose();
+    this.sayaMesh.dispose();
     this.rootNode.dispose();
   }
 }
