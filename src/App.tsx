@@ -9,6 +9,7 @@ import { PauseModal } from './components/PauseModal';
 import { VictoryModal } from './components/VictoryModal';
 import { OrientationNotice } from './components/OrientationNotice';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { StartScreen } from './components/StartScreen';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -18,9 +19,11 @@ export const App: React.FC = () => {
   const [victoryData, setVictoryData] = useState<VictoryPayload | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
 
   // Initialize Babylon.js 3D Game
   useEffect(() => {
+    if (!hasStarted) return;
     if (canvasRef.current && !gameRef.current) {
       try {
         gameRef.current = new Game3D(canvasRef.current);
@@ -78,7 +81,19 @@ export const App: React.FC = () => {
         gameRef.current = null;
       }
     };
-  }, []);
+  }, [hasStarted]);
+
+  useEffect(() => {
+    if (hasStarted) return;
+    const startOnEnter = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.repeat) {
+        event.preventDefault();
+        setHasStarted(true);
+      }
+    };
+    window.addEventListener('keydown', startOnEnter);
+    return () => window.removeEventListener('keydown', startOnEnter);
+  }, [hasStarted]);
 
   useEffect(() => {
     gameRef.current?.setPaused(isPaused);
@@ -87,6 +102,8 @@ export const App: React.FC = () => {
   const handlePause = () => {
     setIsPaused(true);
   };
+
+  const handleStart = () => setHasStarted(true);
 
   const handleResume = () => {
     setIsPaused(false);
@@ -104,6 +121,10 @@ export const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <div className="relative w-full h-full overflow-hidden bg-[#070b12]">
+        {!hasStarted ? (
+          <StartScreen onStart={handleStart} />
+        ) : (
+          <>
         {/* Real Babylon.js 3D Canvas */}
         <canvas
           ref={canvasRef}
@@ -163,6 +184,8 @@ export const App: React.FC = () => {
         />
 
         <OrientationNotice />
+          </>
+        )}
       </div>
     </ErrorBoundary>
   );
