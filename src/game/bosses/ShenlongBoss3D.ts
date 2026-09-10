@@ -28,6 +28,7 @@ export class ShenlongBoss3D {
   public isDead = false;
   public isBossActive = false;
   public phase = 1;
+  private isIntroPlaying = false;
 
   // AI & Attack state
   private attackState: 'IDLE' | 'TELEGRAPH' | 'ATTACK' | 'BEAM' | 'STAGGER' = 'IDLE';
@@ -59,7 +60,7 @@ export class ShenlongBoss3D {
     this.particles = particles;
     this.soundManager = SoundManager.getInstance();
 
-    // 1. Root Collider / Head
+    // Invisible gameplay root; the authored-style visual hierarchy below carries the silhouette.
     this.rootMesh = MeshBuilder.CreateBox('dragonHead', {
       width: 2.4,
       height: 1.8,
@@ -73,7 +74,7 @@ export class ShenlongBoss3D {
     this.headMat = new StandardMaterial('dragonHeadMat', scene);
     this.headMat.diffuseColor = new Color3(0.06, 0.12, 0.22); // Deep celestial indigo
     this.headMat.emissiveColor = new Color3(0.0, 0.45, 0.65); // Cyan cybernetic channels
-    this.rootMesh.material = this.headMat;
+    this.rootMesh.visibility = 0;
 
     this.hornMat = new StandardMaterial('dragonHornMat', scene);
     this.hornMat.diffuseColor = new Color3(0.9, 0.75, 0.2);
@@ -82,6 +83,17 @@ export class ShenlongBoss3D {
     this.bodyMat = new StandardMaterial('dragonBodyMat', scene);
     this.bodyMat.diffuseColor = new Color3(0.08, 0.14, 0.24);
     this.bodyMat.emissiveColor = new Color3(0.0, 0.35, 0.5);
+
+    const dragonVisual = new TransformNode('shenlongVisualRig', scene);
+    dragonVisual.parent = this.rootMesh;
+    const skull = MeshBuilder.CreatePolyhedron('shenlongCelestialSkull', { type: 2, size: 2.1 }, scene);
+    skull.parent = dragonVisual; skull.scaling = new Vector3(0.9, 0.72, 1.3); skull.position = new Vector3(0, 0.15, 0.55); skull.material = this.headMat;
+    const muzzle = MeshBuilder.CreateBox('shenlongMuzzle', { width: 1.35, height: 0.55, depth: 1.25 }, scene);
+    muzzle.parent = dragonVisual; muzzle.position = new Vector3(0, -0.25, 1.55); muzzle.material = this.bodyMat;
+    const jaw = MeshBuilder.CreateBox('shenlongJaw', { width: 1.18, height: 0.24, depth: 1.08 }, scene);
+    jaw.parent = dragonVisual; jaw.position = new Vector3(0, -0.66, 1.43); jaw.material = this.hornMat;
+    const collar = MeshBuilder.CreateTorus('shenlongReactorCollar', { diameter: 2.45, thickness: 0.17, tessellation: 16 }, scene);
+    collar.parent = dragonVisual; collar.position = new Vector3(0, 0, -1.02); collar.rotation.x = Math.PI / 2; collar.material = this.hornMat;
 
     // Branching Celestial Horns
     const leftHorn = MeshBuilder.CreateCylinder('lHorn', { height: 2.2, diameterTop: 0.08, diameterBottom: 0.32 }, scene);
@@ -109,16 +121,15 @@ export class ShenlongBoss3D {
     rightEye.position = new Vector3(0.85, 0.4, 1.1);
     rightEye.material = eyeMat;
 
-    // 2. Trailing Serpentine Body Segments
+    // Segmented armored body: a deliberate spine architecture rather than a string of spheres.
     for (let i = 0; i < this.segmentCount; i++) {
-      const seg = MeshBuilder.CreateSphere(`dragonSeg_${i}`, {
-        diameterX: 2.0 - i * 0.08,
-        diameterY: 1.8 - i * 0.08,
-        diameterZ: 2.2 - i * 0.08
-      }, scene);
+      const seg = MeshBuilder.CreateCapsule(`dragonSeg_${i}`, { radius: 0.9 - i * 0.045, height: 2.25 - i * 0.09, tessellation: 10 }, scene);
       seg.position = spawnPos.clone();
+      seg.rotation.x = Math.PI / 2;
       seg.material = this.bodyMat;
       this.bodySegments.push(seg);
+      const armorBand = MeshBuilder.CreateTorus(`dragonArmorBand_${i}`, { diameter: 1.72 - i * 0.09, thickness: 0.12, tessellation: 12 }, scene);
+      armorBand.parent = seg; armorBand.rotation.x = Math.PI / 2; armorBand.material = this.hornMat;
     }
 
     // Pre-fill history buffer
@@ -134,9 +145,11 @@ export class ShenlongBoss3D {
 
     const dist = Vector3.Distance(this.rootMesh.position, this.targetPlayer.rootMesh.position);
 
-    if (!this.isBossActive && dist <= 32.0) {
-      this.activateBoss();
+    if (!this.isBossActive && !this.isIntroPlaying && dist <= 32.0) {
+      this.beginReveal();
     }
+
+    if (this.isIntroPlaying) return;
 
     if (this.isBossActive) {
       this.syncBossBar();
@@ -191,6 +204,22 @@ export class ShenlongBoss3D {
         this.bodySegments[i].rotation.y = point.rotY;
       }
     }
+  }
+
+  private beginReveal() {
+    this.isIntroPlaying = true;
+    this.targetPlayer.controlsLocked = true;
+    this.rootMesh.position.y = 14;
+    this.targetPlayer.camera.beginCinematic(this.rootMesh.position.add(new Vector3(0, 1.5, 0)), 2200);
+    this.soundManager.playCharge();
+    GameBridge.emit('toast_message', { title: 'DRAGON SANCTUM // CORE AWAKENING', subtitle: 'The ancient reactor answers your presence.', type: 'alert' });
+    window.setTimeout(() => this.particles.emitShockwave(new Vector3(0, 0.3, 192), 14, new Color3(0.04, 0.72, 0.42)), 650);
+    window.setTimeout(() => {
+      this.rootMesh.position.y = 5.2;
+      this.isIntroPlaying = false;
+      this.targetPlayer.controlsLocked = false;
+      this.activateBoss();
+    }, 2200);
   }
 
   private activateBoss() {

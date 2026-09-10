@@ -60,6 +60,8 @@ export class Player3D {
   public isAttacking = false;
   public isChargingHeavy = false;
   public isDead = false;
+  /** Used only for short real-time boss reveals; normal control is restored automatically. */
+  public controlsLocked = false;
   public comboIndex = 0;
   public onAttackHitCheck: ((isHeavy: boolean, damage: number) => void) | null = null;
   public onWaveActivate: (() => void) | null = null;
@@ -389,6 +391,39 @@ export class Player3D {
     rightBoot.parent = this.rightFootNode;
     rightBoot.material = goldMat;
     this.visibleMeshes.push(rightBoot);
+
+    // Temporary Lin Yun identity pass. This remains explicitly GLB-ready until an authored asset arrives.
+    const coatMat = new StandardMaterial('linYunCoat', scene);
+    coatMat.diffuseColor = new Color3(0.10, 0.16, 0.15);
+    coatMat.emissiveColor = new Color3(0.01, 0.035, 0.022);
+    const trimMat = new StandardMaterial('linYunJadeTrim', scene);
+    trimMat.emissiveColor = new Color3(0.06, 0.42, 0.23);
+    trimMat.disableLighting = true;
+    [-1, 1].forEach(side => {
+      const coatTail = MeshBuilder.CreatePlane(`linYunCoatTail_${side}`, { width: 0.29, height: 0.72 }, scene);
+      coatTail.parent = this.hipsNode;
+      coatTail.position = new Vector3(side * 0.15, -0.34, -0.12);
+      coatTail.rotation = new Vector3(0.12, side * 0.22, 0);
+      coatTail.material = coatMat;
+      this.visibleMeshes.push(coatTail);
+      const cable = MeshBuilder.CreateTorus(`linYunCable_${side}`, { diameter: 0.32, thickness: 0.022, tessellation: 10 }, scene);
+      cable.parent = this.chestNode;
+      cable.position = new Vector3(side * 0.18, 0.18, 0.18);
+      cable.rotation.x = Math.PI / 2;
+      cable.material = trimMat;
+      this.visibleMeshes.push(cable);
+    });
+    const shoulderFrame = MeshBuilder.CreateBox('linYunAsymmetricShoulder', { width: 0.3, height: 0.13, depth: 0.22 }, scene);
+    shoulderFrame.parent = this.leftShoulderNode;
+    shoulderFrame.position.y = 0.08;
+    shoulderFrame.material = goldMat;
+    this.visibleMeshes.push(shoulderFrame);
+    const spineHalo = MeshBuilder.CreateTorus('linYunSpineHalo', { diameter: 0.44, thickness: 0.028, tessellation: 12 }, scene);
+    spineHalo.parent = this.chestNode;
+    spineHalo.position = new Vector3(0, 0.12, -0.17);
+    spineHalo.rotation.x = Math.PI / 2;
+    spineHalo.material = trimMat;
+    this.visibleMeshes.push(spineHalo);
   }
 
   private initInputs() {
@@ -529,6 +564,7 @@ export class Player3D {
 
   private handleMovement(dt: number) {
     if (this.isDead) return;
+    if (this.controlsLocked) { this.isSprinting = false; this.animState = 'idle'; return; }
 
     // Movement lock during heavy attack or jump start
     if (this.animState === 'jump_start' || this.isChargingHeavy) {
@@ -780,7 +816,7 @@ export class Player3D {
 
   // --- Combat Action Triggers ---
   public triggerLightAttack() {
-    if (this.isDead || this.isDodging) return;
+    if (this.isDead || this.isDodging || this.controlsLocked) return;
 
     this.sheathTimer = 0;
     this.hasCheckedHitThisAttack = false;
@@ -810,7 +846,7 @@ export class Player3D {
   }
 
   public startChargingHeavy() {
-    if (this.isDead || this.isDodging) return;
+    if (this.isDead || this.isDodging || this.controlsLocked) return;
     this.isChargingHeavy = true;
     this.animState = 'heavy_charge';
     this.soundManager.playCharge();
@@ -838,7 +874,7 @@ export class Player3D {
   }
 
   public triggerJump() {
-    if (this.isDead) return;
+    if (this.isDead || this.controlsLocked) return;
     if (this.isGrounded && this.animState !== 'jump_start' && this.animState !== 'airborne') {
       this.animState = 'jump_start';
       this.stateTimer = 110;
@@ -853,7 +889,7 @@ export class Player3D {
   }
 
   public triggerDodge() {
-    if (this.isDead || this.isDodging || this.stamina < 25) return;
+    if (this.isDead || this.isDodging || this.stamina < 25 || this.controlsLocked) return;
     this.stamina -= 25;
     this.isDodging = true;
     this.isInvulnerable = true;

@@ -132,6 +132,7 @@ export class CombatManager3D {
 
       if (waveLife <= 0) {
         clearInterval(interval);
+        this.particles.stopTransmutationWave(waveMesh);
       }
     }, 40);
   }

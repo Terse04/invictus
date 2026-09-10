@@ -158,13 +158,11 @@ export class Weapon3D {
       trailMat.alpha = 0.62;
       this.trailMesh.material = trailMat;
     }
+    this.trailMesh.isVisible = true;
   }
 
   public deactivateTrail() {
-    if (this.trailMesh) {
-      this.trailMesh.dispose();
-      this.trailMesh = null;
-    }
+    if (this.trailMesh) this.trailMesh.isVisible = false;
   }
 
   public getWorldTipPosition(): Vector3 {
@@ -172,7 +170,7 @@ export class Weapon3D {
   }
 
   public dispose() {
-    this.deactivateTrail();
+    this.trailMesh?.dispose();
     this.bladeMesh.dispose();
     this.guardMesh.dispose();
     this.hiltMesh.dispose();

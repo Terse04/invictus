@@ -7,9 +7,9 @@ import { ArenaGate3D } from './world/ArenaGate3D';
 import { Telegraph3D } from './combat/Telegraph3D';
 import { ParticleVFX3D } from './vfx/ParticleVFX3D';
 import { CombatManager3D } from './combat/CombatManager3D';
-import { GaleProwler3D } from './enemies/GaleProwler3D';
-import { JadeWarden3D } from './enemies/JadeWarden3D';
-import { FluxWyrmling3D } from './enemies/FluxWyrmling3D';
+import { TerracottaRevenant3D } from './enemies/TerracottaRevenant3D';
+import { BronzeHoplite3D } from './enemies/BronzeHoplite3D';
+import { CyberScarab3D } from './enemies/CyberScarab3D';
 import { VanguardBoss3D } from './bosses/VanguardBoss3D';
 import { ShenlongBoss3D } from './bosses/ShenlongBoss3D';
 import { ElderYan3D } from './npc/ElderYan3D';
@@ -42,7 +42,7 @@ export class Game3D {
     this.particles = new ParticleVFX3D(this.engine.scene);
 
     // 3. 3D Environment (Celestial Ruins)
-    this.environment = new Environment3D(this.engine.scene, this.engine.shadowGenerator);
+    this.environment = new Environment3D(this.engine.scene, this.engine.shadowGenerator, this.engine.quality);
 
     // 4. 3D Protagonist Lin Yun (Spawn in Zone 1: Awakening Terrace)
     const spawnPos = new Vector3(0, 0, -5);
@@ -107,6 +107,7 @@ export class Game3D {
       // Update Player & Camera
       this.player.update(delta);
       this.camera.update(delta);
+      this.particles.update(delta);
 
       // Update NPC
       this.elderYan.update();
@@ -144,17 +145,17 @@ export class Game3D {
   }
 
   private spawnEnemies() {
-    // Zone 1 (Awakening Terrace): 2x Gale Prowlers
-    const prowler1 = new GaleProwler3D(this.engine.scene, new Vector3(-4, 0, 4), this.player, this.telegraph, this.particles);
-    const prowler2 = new GaleProwler3D(this.engine.scene, new Vector3(4, 0, 6), this.player, this.telegraph, this.particles);
-    this.combatManager.enemies.push(prowler1, prowler2);
+    // Zone 1: the first enemy must establish the world’s transmuted identity.
+    const revenant1 = new TerracottaRevenant3D(this.engine.scene, new Vector3(-4, 0, 4), this.player, this.telegraph, this.particles);
+    const revenant2 = new TerracottaRevenant3D(this.engine.scene, new Vector3(4, 0, 6), this.player, this.telegraph, this.particles);
+    this.combatManager.enemies.push(revenant1, revenant2);
 
     // Zone 3 (Sunken Colonnade): Mixed Encounter
-    const prowler3 = new GaleProwler3D(this.engine.scene, new Vector3(-6, 0, 70), this.player, this.telegraph, this.particles);
-    const prowler4 = new GaleProwler3D(this.engine.scene, new Vector3(6, 0, 74), this.player, this.telegraph, this.particles);
-    const warden1 = new JadeWarden3D(this.engine.scene, new Vector3(0, 0, 80), this.player, this.telegraph, this.particles);
-    const wyrm1 = new FluxWyrmling3D(this.engine.scene, new Vector3(5, 0, 84), this.player, this.telegraph, this.particles);
-    this.combatManager.enemies.push(prowler3, prowler4, warden1, wyrm1);
+    const revenant3 = new TerracottaRevenant3D(this.engine.scene, new Vector3(-6, 0, 70), this.player, this.telegraph, this.particles);
+    const revenant4 = new TerracottaRevenant3D(this.engine.scene, new Vector3(6, 0, 74), this.player, this.telegraph, this.particles);
+    const hoplite = new BronzeHoplite3D(this.engine.scene, new Vector3(0, 0, 80), this.player, this.telegraph, this.particles);
+    const scarab = new CyberScarab3D(this.engine.scene, new Vector3(5, 0, 84), this.player, this.telegraph, this.particles);
+    this.combatManager.enemies.push(revenant3, revenant4, hoplite, scarab);
 
     // Zone 4: Mini-Boss Centurion Lei-Guan
     this.combatManager.vanguardBoss = new VanguardBoss3D(

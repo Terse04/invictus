@@ -9,6 +9,7 @@ export class ThirdPersonCamera {
   private isSprinting = false;
   private shakeIntensity = 0;
   private shakeTimer = 0;
+  private cinematic: { target: Vector3; alpha: number; beta: number; radius: number; remaining: number } | null = null;
   private readonly onCanvasClick: () => void;
   private readonly onMouseMove: (event: MouseEvent) => void;
   private readonly onPointerLockChange: () => void;
@@ -40,8 +41,15 @@ export class ThirdPersonCamera {
   }
 
   public update(delta: number) {
-    const desiredTarget = this.targetMesh.position.add(this.targetOffset);
+    const desiredTarget = this.cinematic?.target ?? this.targetMesh.position.add(this.targetOffset);
     Vector3.LerpToRef(this.camera.target, desiredTarget, Math.min(1, delta * 0.012), this.camera.target);
+    if (this.cinematic) {
+      this.camera.alpha = Scalar.Lerp(this.camera.alpha, this.cinematic.alpha, Math.min(1, delta * 0.006));
+      this.camera.beta = Scalar.Lerp(this.camera.beta, this.cinematic.beta, Math.min(1, delta * 0.006));
+      this.camera.radius = Scalar.Lerp(this.camera.radius, this.cinematic.radius, Math.min(1, delta * 0.006));
+      this.cinematic.remaining -= delta;
+      if (this.cinematic.remaining <= 0) this.cinematic = null;
+    }
     this.camera.fov = Scalar.Lerp(this.camera.fov, (this.isSprinting ? 58 : 50) * Math.PI / 180, Math.min(1, delta * 0.007));
     if (this.shakeTimer > 0) {
       this.shakeTimer -= delta;
@@ -51,6 +59,9 @@ export class ThirdPersonCamera {
   }
 
   public setSprinting(value: boolean) { this.isSprinting = value; }
+  public beginCinematic(target: Vector3, duration = 1800) {
+    this.cinematic = { target: target.clone(), alpha: -Math.PI / 2.55, beta: Math.PI / 2.75, radius: 14, remaining: duration };
+  }
   public shake(intensity = 0.18, duration = 180) { this.shakeIntensity = intensity; this.shakeTimer = duration; }
   public rotateBy(deltaAlpha: number, deltaBeta: number) {
     this.camera.alpha += deltaAlpha;

@@ -11,8 +11,8 @@ export interface EnemyConfig {
 }
 
 export const ENEMY_CONFIGS = {
-  galeProwler: {
-    name: 'Gale Prowler',
+  terracottaRevenant: {
+    name: 'Terracotta Revenant',
     maxHp: 90,
     speed: 155,
     damage: 14,
@@ -22,8 +22,8 @@ export const ENEMY_CONFIGS = {
     poise: 25,
     scoreValue: 150
   },
-  jadeWarden: {
-    name: 'Jade Warden',
+  bronzeHoplite: {
+    name: 'Bronze Hoplite Automaton',
     maxHp: 240,
     speed: 80,
     damage: 28,
@@ -33,8 +33,8 @@ export const ENEMY_CONFIGS = {
     poise: 80,
     scoreValue: 350
   },
-  fluxWyrmling: {
-    name: 'Flux Wyrmling',
+  cyberScarab: {
+    name: 'Cyber Scarab Relic',
     maxHp: 75,
     speed: 120,
     damage: 12,
@@ -44,6 +44,10 @@ export const ENEMY_CONFIGS = {
     poise: 15,
     scoreValue: 200
   },
+  // Legacy aliases retained only so archived prototype classes still type-check; they are not spawned.
+  galeProwler: { name: 'Retired Gale Prowler', maxHp: 90, speed: 155, damage: 14, attackRange: 48, aggroRange: 280, attackCooldown: 1400, poise: 25, scoreValue: 0 },
+  jadeWarden: { name: 'Retired Jade Warden', maxHp: 240, speed: 80, damage: 28, attackRange: 70, aggroRange: 320, attackCooldown: 2200, poise: 80, scoreValue: 0 },
+  fluxWyrmling: { name: 'Retired Flux Wyrmling', maxHp: 75, speed: 120, damage: 12, attackRange: 240, aggroRange: 360, attackCooldown: 2000, poise: 15, scoreValue: 0 },
   vanguardBoss: {
     name: 'Centurion Lei-Guan',
     maxHp: 850,

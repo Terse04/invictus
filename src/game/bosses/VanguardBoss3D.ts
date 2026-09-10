@@ -61,6 +61,27 @@ export class VanguardBoss3D extends EnemyBase3D {
     head.position.y = 2.8;
     head.material = armorMat;
 
+    // Ceremonial silhouette: broad guardian shoulders, a command crest, and visible conduits.
+    [-1, 1].forEach(side => {
+      const shoulder = MeshBuilder.CreateSphere(`vanguardShoulder_${side}`, { diameter: 0.82, segments: 8 }, scene);
+      shoulder.parent = bossNode;
+      shoulder.position = new Vector3(side * 0.92, 2.18, 0);
+      shoulder.material = armorMat;
+      const cable = MeshBuilder.CreateTorus(`vanguardCable_${side}`, { diameter: 0.66, thickness: 0.045, tessellation: 12 }, scene);
+      cable.parent = bossNode;
+      cable.position = new Vector3(side * 0.48, 1.65, 0.52);
+      cable.rotation.x = Math.PI / 2;
+      cable.material = coreMat;
+    });
+    const crest = MeshBuilder.CreateBox('vanguardCommandCrest', { width: 0.18, height: 1.05, depth: 0.28 }, scene);
+    crest.parent = bossNode;
+    crest.position = new Vector3(0, 3.42, -0.1);
+    crest.material = coreMat;
+    const mantle = MeshBuilder.CreateCylinder('vanguardCeremonialMantle', { height: 0.72, diameterTop: 1.85, diameterBottom: 2.35, tessellation: 8 }, scene);
+    mantle.parent = bossNode;
+    mantle.position.y = 0.48;
+    mantle.material = armorMat;
+
     // Massive Thunder Halberd
     this.halberdMesh = MeshBuilder.CreateCylinder('vanguardHalberd', {
       height: 3.8,

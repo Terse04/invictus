@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GameSettings, loadSettings, saveSettings } from '../utils/storage';
 import { SoundManager } from '../game/audio/SoundManager';
+import { QualityLevel, resolveQuality, setQuality } from '../game/QualitySettings';
 import { Volume2, Sliders, Shield, RotateCcw, Play, Download } from 'lucide-react';
 
 interface PauseModalProps {
@@ -17,6 +18,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
   deferredPrompt
 }) => {
   const [settings, setSettings] = useState<GameSettings>(loadSettings());
+  const [quality] = useState<QualityLevel>(() => resolveQuality().level);
   const soundManager = SoundManager.getInstance();
 
   if (!isOpen) return null;
@@ -38,6 +40,12 @@ export const PauseModal: React.FC<PauseModalProps> = ({
     if (deferredPrompt) {
       deferredPrompt.prompt();
     }
+  };
+
+  const handleQualityChange = (level: QualityLevel) => {
+    if (level === quality) return;
+    setQuality(level);
+    window.location.reload();
   };
 
   return (
@@ -144,6 +152,25 @@ export const PauseModal: React.FC<PauseModalProps> = ({
               <span>Damage Text</span>
               <span>{settings.showDamageNumbers ? 'ON' : 'OFF'}</span>
             </button>
+          </div>
+
+          <div className="pt-2">
+            <div className="flex items-center space-x-2 text-sm font-cinzel text-slate-200 mb-2">
+              <Sliders className="w-4 h-4 text-emerald-400" />
+              <span>GRAPHICS QUALITY</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {(['low', 'medium', 'high'] as QualityLevel[]).map(level => (
+                <button
+                  key={level}
+                  onClick={() => handleQualityChange(level)}
+                  className={`py-2 rounded border text-xs font-tech uppercase transition-all ${quality === level ? 'border-emerald-400 bg-emerald-950 text-emerald-400' : 'border-slate-800 bg-slate-900 text-slate-400'}`}
+                >
+                  {level}{level === quality ? ' · ACTIVE' : ''}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] font-tech text-slate-500 mt-2">Applies shadow resolution, render scale, and atmospheric density after reload.</p>
           </div>
         </div>
 

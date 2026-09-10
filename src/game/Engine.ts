@@ -9,6 +9,7 @@ import {
   ShadowGenerator
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
+import { QualityProfile, resolveQuality } from './QualitySettings';
 
 export class GameEngine {
   public engine: Engine;
@@ -16,6 +17,7 @@ export class GameEngine {
   public shadowGenerator: ShadowGenerator;
   public dirLight: DirectionalLight;
   public hemiLight: HemisphericLight;
+  public readonly quality: QualityProfile;
   private handleResize: () => void;
   private handleContextLost: (e: Event) => void;
   private handleContextRestored: () => void;
@@ -23,6 +25,7 @@ export class GameEngine {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+    this.quality = resolveQuality();
 
     if (!Engine.isSupported()) {
       throw new Error('WebGL is not supported on this browser/device. Please enable hardware acceleration.');
@@ -46,6 +49,7 @@ export class GameEngine {
       stencil: true,
       powerPreference: 'high-performance'
     });
+    this.engine.setHardwareScalingLevel(this.quality.hardwareScaling);
 
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.16, 0.22, 0.27, 1.0);
@@ -76,9 +80,9 @@ export class GameEngine {
     rimLight.diffuse = new Color3(0.36, 0.68, 0.45);
 
     // Dynamic Shadow Generator
-    this.shadowGenerator = new ShadowGenerator(2048, this.dirLight);
-    this.shadowGenerator.useBlurExponentialShadowMap = true;
-    this.shadowGenerator.blurKernel = 16;
+    this.shadowGenerator = new ShadowGenerator(this.quality.shadowMapSize, this.dirLight);
+    this.shadowGenerator.useBlurExponentialShadowMap = this.quality.blurShadows;
+    this.shadowGenerator.blurKernel = this.quality.level === 'high' ? 16 : 8;
     this.shadowGenerator.setDarkness(0.45);
 
     // Render loop

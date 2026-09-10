@@ -2,6 +2,7 @@ import {
   Scene, Mesh, MeshBuilder, StandardMaterial, Color3, Color4, Vector3,
   ShadowGenerator, ParticleSystem, VertexBuffer
 } from '@babylonjs/core';
+import { QualityProfile } from '../QualitySettings';
 
 /** A single traversable sanctuary: terrain first, ruins and jade technology second. */
 export class Environment3D {
@@ -9,10 +10,12 @@ export class Environment3D {
   public floatingElements: Mesh[] = [];
   private readonly scene: Scene;
   private readonly shadows: ShadowGenerator;
+  private readonly quality: QualityProfile;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator, quality: QualityProfile) {
     this.scene = scene;
     this.shadows = shadowGenerator;
+    this.quality = quality;
     this.buildSanctuary();
     this.spawnAtmosphere();
   }
@@ -61,9 +64,53 @@ export class Environment3D {
     this.createTerrace(new Vector3(0, 0.18, 138), 32, 0.48, stone, amber);
     this.createTorii(new Vector3(0, 0.3, 158), darkStone, jade);
     this.createTerrace(new Vector3(0, 0.18, 192), 50, 0.5, stone, jade);
+    this.createTransmutationLandmarks(darkStone, jade, amber);
 
     this.scatterNature(stone, grass);
     this.buildSky(amber);
+  }
+
+  /** Large landmarks are sparse on purpose: they create a civilization, not prop noise. */
+  private createTransmutationLandmarks(ruin: StandardMaterial, jade: StandardMaterial, amber: StandardMaterial) {
+    // A shattered guardian on the approach — Chinese influence is dominant.
+    const statue = new Mesh('fallenCelestialGuardian', this.scene);
+    statue.position = new Vector3(-22, 0, 48);
+    const torso = MeshBuilder.CreateCylinder('guardianTorso', { height: 9, diameterTop: 3.3, diameterBottom: 4.3, tessellation: 9 }, this.scene);
+    torso.parent = statue; torso.position.y = 4.2; torso.rotation.z = -0.34; torso.material = ruin;
+    const head = MeshBuilder.CreatePolyhedron('guardianMask', { type: 1, size: 3.1 }, this.scene);
+    head.parent = statue; head.position = new Vector3(-1.1, 8.4, 0.2); head.material = ruin;
+    const halo = MeshBuilder.CreateTorus('guardianBrokenHalo', { diameter: 6.2, thickness: 0.2, tessellation: 24 }, this.scene);
+    halo.parent = statue; halo.position = new Vector3(-1.3, 8.7, -0.2); halo.rotation.x = Math.PI / 2; halo.material = jade;
+    this.shadows.addShadowCaster(torso); this.shadows.addShadowCaster(head);
+
+    // Ancient power conduits make the technology physical rather than a surface glow.
+    [-1, 1].forEach((side) => {
+      const conduit = MeshBuilder.CreateTube(`jadeConduit_${side}`, {
+        path: [new Vector3(side * 6, 0.25, 108), new Vector3(side * 8, 1.4, 124), new Vector3(side * 5, 0.5, 142)],
+        radius: 0.18, tessellation: 8
+      }, this.scene);
+      conduit.material = jade;
+      const housing = MeshBuilder.CreateCylinder(`conduitHousing_${side}`, { height: 1.8, diameter: 1.2, tessellation: 8 }, this.scene);
+      housing.position = new Vector3(side * 6, 0.8, 108); housing.material = ruin; this.shadows.addShadowCaster(housing);
+    });
+
+    // Restrained convergence clues: a distant bronze arch and buried solar relic, never a theme park.
+    const bronzeHint = this.material('distantBronzeConvergence', new Color3(0.25, 0.14, 0.05), new Color3(0.03, 0.012, 0.002));
+    const arch = MeshBuilder.CreateTorus('distantBronzeArch', { diameter: 12, thickness: 0.55, tessellation: 18 }, this.scene);
+    arch.position = new Vector3(34, 6.5, 136); arch.rotation.x = Math.PI / 2; arch.material = bronzeHint;
+    const solarRelic = MeshBuilder.CreateDisc('buriedSolarRelic', { radius: 3.4, tessellation: 12 }, this.scene);
+    solarRelic.position = new Vector3(-29, 0.35, 112); solarRelic.rotation.x = Math.PI / 2; solarRelic.material = amber;
+
+    // Dragon Sanctum: deliberately circular, tall, and mechanically alive.
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const pylon = MeshBuilder.CreateCylinder(`sanctumPylon_${i}`, { height: 8 + (i % 2) * 2.2, diameterTop: 0.24, diameterBottom: 1.1, tessellation: 7 }, this.scene);
+      pylon.position = new Vector3(Math.cos(angle) * 19, 4, 192 + Math.sin(angle) * 19); pylon.material = ruin; this.shadows.addShadowCaster(pylon);
+      const emitter = MeshBuilder.CreateSphere(`sanctumEmitter_${i}`, { diameter: 0.42, segments: 8 }, this.scene);
+      emitter.parent = pylon; emitter.position.y = 4.1; emitter.material = jade;
+    }
+    const reactor = MeshBuilder.CreateCylinder('sanctumReactor', { height: 0.6, diameter: 9, tessellation: 32 }, this.scene);
+    reactor.position = new Vector3(0, 0.35, 192); reactor.material = amber;
   }
 
   private material(name: string, diffuse: Color3, emissive: Color3) {
@@ -165,14 +212,14 @@ export class Environment3D {
   }
 
   private spawnAtmosphere() {
-    const motes = new ParticleSystem('windborneMotes', 220, this.scene);
+    const motes = new ParticleSystem('windborneMotes', this.quality.particleCapacity, this.scene);
     motes.createPointEmitter(new Vector3(-50, 0, -20), new Vector3(50, 14, 235));
     motes.color1 = new Color4(0.68, 0.78, 0.55, 0.55);
     motes.color2 = new Color4(0.96, 0.69, 0.28, 0.38);
     motes.colorDead = new Color4(0, 0, 0, 0);
     motes.minSize = 0.025; motes.maxSize = 0.11;
     motes.minLifeTime = 4; motes.maxLifeTime = 8;
-    motes.emitRate = 20;
+    motes.emitRate = this.quality.particleRate;
     motes.direction1 = new Vector3(-0.2, 0.2, 0.1); motes.direction2 = new Vector3(0.2, 0.7, 0.5);
     motes.start();
   }
