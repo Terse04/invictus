@@ -49,6 +49,7 @@ export class Game3D {
     // Dummy target object for camera initialization
     const targetRef = { position: spawnPos.clone() };
     this.camera = new ThirdPersonCamera(this.engine.scene, canvas, targetRef);
+    this.engine.configureRendering(this.camera.camera);
 
     this.player = new Player3D(this.engine.scene, this.camera, spawnPos);
     targetRef.position = this.player.rootMesh.position;
@@ -70,7 +71,7 @@ export class Game3D {
         bladeRoot: this.player.weapon.rootNode.getAbsolutePosition(),
         bladeTip: this.player.weapon.getWorldTipPosition(),
         direction: forward,
-        range: isHeavy ? 3.8 : 2.8,
+        range: isHeavy ? 4.2 : 3.2,
         damage,
         poiseDamage: isHeavy ? 45 : 20,
         isHeavy

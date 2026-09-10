@@ -5,7 +5,8 @@ import {
   StandardMaterial,
   Color3,
   Vector3,
-  TransformNode
+  TransformNode,
+  Ray
 } from '@babylonjs/core';
 import { Player3D } from '../player/Player3D';
 import { Telegraph3D } from '../combat/Telegraph3D';
@@ -37,6 +38,7 @@ export abstract class EnemyBase3D {
   // 3D Floating Health Bar Plane
   protected hpBarMesh: Mesh;
   protected hpFillMesh: Mesh;
+  protected isHovering = false;
 
   constructor(
     scene: Scene,
@@ -59,10 +61,13 @@ export abstract class EnemyBase3D {
     this.poise = config.poise;
 
     // Root Collider
-    this.rootMesh = MeshBuilder.CreateBox('enemyCollider', { size: 1.0 }, scene);
+    this.rootMesh = MeshBuilder.CreateBox('enemyCollider', { width: 0.82, height: 0.08, depth: 0.82 }, scene);
     this.rootMesh.position = spawnPos.clone();
     this.rootMesh.checkCollisions = true;
     this.rootMesh.visibility = 0; // invisible collision root
+    this.rootMesh.ellipsoid = new Vector3(0.41, 0.04, 0.41);
+    this.rootMesh.ellipsoidOffset = new Vector3(0, 0.04, 0);
+    this.groundToWorld();
 
     // Floating 3D Health Bar
     this.hpBarMesh = MeshBuilder.CreatePlane('hpBarBg', { width: 1.4, height: 0.14 }, scene);
@@ -88,6 +93,7 @@ export abstract class EnemyBase3D {
   public update(delta: number) {
     if (this.isDead) return;
 
+    if (!this.isHovering) this.groundToWorld();
     this.updateHpBar();
 
     const dist = Vector3.Distance(this.rootMesh.position, this.targetPlayer.rootMesh.position);
@@ -118,10 +124,20 @@ export abstract class EnemyBase3D {
     const angle = Math.atan2(dir.x, dir.z);
     this.rootMesh.rotation.y = angle;
 
-    // Move with collisions
     const moveStep = dir.scale((this.config.speed * 0.02 * delta) / 1000);
-    moveStep.y = -9.81 * (delta / 1000) * 0.5; // Gravity
+    moveStep.y = 0;
     this.rootMesh.moveWithCollisions(moveStep);
+  }
+
+  protected getGroundY() {
+    const ray = new Ray(this.rootMesh.position.add(new Vector3(0, 3, 0)), Vector3.Down(), 8);
+    const hit = this.scene.pickWithRay(ray, mesh => mesh.checkCollisions && mesh !== this.rootMesh);
+    return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : null;
+  }
+
+  protected groundToWorld() {
+    const groundY = this.getGroundY();
+    if (groundY !== null) this.rootMesh.position.y = groundY;
   }
 
   protected abstract startAttackSequence(): void;

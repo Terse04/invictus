@@ -43,6 +43,7 @@ export class Environment3D {
     terrain.receiveShadows = true;
     terrain.material = grass;
     this.groundMeshes.push(terrain);
+    this.createSafetyBounds();
 
     // A stone road visually grounds the intended traversal route while terrain remains continuous underneath.
     const road = MeshBuilder.CreateGround('ancientStoneRoad', { width: 8.2, height: 245, subdivisions: 48 }, this.scene);
@@ -56,18 +57,38 @@ export class Environment3D {
       seam.material = darkStone;
     }
 
-    this.createTerrace(new Vector3(0, 0.18, 0), 25, 0.5, stone, jade);
+    this.createTerrace(new Vector3(0, 0.18, 0), 25, 0.5, stone);
     this.createTorii(new Vector3(0, 0.3, 16), darkStone, jade);
-    this.createTerrace(new Vector3(0, 0.18, 42), 19, 0.42, stone, amber);
+    this.createTerrace(new Vector3(0, 0.18, 42), 19, 0.42, stone);
     this.createTorii(new Vector3(0, 0.3, 64), darkStone, jade);
     this.createColonnade(stone, jade);
-    this.createTerrace(new Vector3(0, 0.18, 138), 32, 0.48, stone, amber);
+    this.createTerrace(new Vector3(0, 0.18, 138), 32, 0.48, stone);
     this.createTorii(new Vector3(0, 0.3, 158), darkStone, jade);
-    this.createTerrace(new Vector3(0, 0.18, 192), 50, 0.5, stone, jade);
+    this.createTerrace(new Vector3(0, 0.18, 192), 50, 0.5, darkStone, jade, true);
     this.createTransmutationLandmarks(darkStone, jade, amber);
 
     this.scatterNature(stone, grass);
     this.buildSky(amber);
+  }
+
+  private createSafetyBounds() {
+    const catchFloor = MeshBuilder.CreateGround('sanctuaryCatchFloor', { width: 54, height: 250 }, this.scene);
+    catchFloor.position = new Vector3(0, -2, 100);
+    catchFloor.checkCollisions = true;
+    catchFloor.visibility = 0;
+
+    const walls = [
+      { name: 'sanctuaryWallWest', position: new Vector3(-26, 3, 100), width: 0.5, depth: 250 },
+      { name: 'sanctuaryWallEast', position: new Vector3(26, 3, 100), width: 0.5, depth: 250 },
+      { name: 'sanctuaryWallSouth', position: new Vector3(0, 3, -21), width: 52, depth: 0.5 },
+      { name: 'sanctuaryWallNorth', position: new Vector3(0, 3, 221), width: 52, depth: 0.5 }
+    ];
+    walls.forEach(wall => {
+      const mesh = MeshBuilder.CreateBox(wall.name, { width: wall.width, height: 8, depth: wall.depth }, this.scene);
+      mesh.position = wall.position;
+      mesh.checkCollisions = true;
+      mesh.visibility = 0;
+    });
   }
 
   /** Large landmarks are sparse on purpose: they create a civilization, not prop noise. */
@@ -118,19 +139,22 @@ export class Environment3D {
     material.diffuseColor = diffuse;
     material.emissiveColor = emissive;
     material.specularColor = new Color3(0.12, 0.15, 0.12);
+    material.specularPower = 24;
     return material;
   }
 
-  private createTerrace(pos: Vector3, diameter: number, height: number, stone: StandardMaterial, rune: StandardMaterial) {
+  private createTerrace(pos: Vector3, diameter: number, height: number, stone: StandardMaterial, rune?: StandardMaterial, hasRunicRing = false) {
     const terrace = MeshBuilder.CreateCylinder(`terrace_${pos.z}`, { height, diameter, tessellation: 40 }, this.scene);
     terrace.position = pos.subtract(new Vector3(0, height / 2, 0));
     terrace.checkCollisions = true;
     terrace.receiveShadows = true;
     terrace.material = stone;
     this.groundMeshes.push(terrace);
-    const ring = MeshBuilder.CreateTorus(`runeRing_${pos.z}`, { diameter: diameter * 0.58, thickness: 0.12, tessellation: 40 }, this.scene);
-    ring.position = pos.add(new Vector3(0, 0.04, 0));
-    ring.material = rune;
+    if (hasRunicRing && rune) {
+      const ring = MeshBuilder.CreateTorus(`runeRing_${pos.z}`, { diameter: diameter * 0.58, thickness: 0.12, tessellation: 40 }, this.scene);
+      ring.position = pos.add(new Vector3(0, 0.04, 0));
+      ring.material = rune;
+    }
   }
 
   private createTorii(pos: Vector3, stone: StandardMaterial, rune: StandardMaterial) {
@@ -177,9 +201,12 @@ export class Environment3D {
     const rock = MeshBuilder.CreatePolyhedron('boulderSource', { type: 2, size: 1.7 }, this.scene);
     rock.material = stone;
     rock.isVisible = false;
-    const tuft = MeshBuilder.CreateCylinder('grassTuftSource', { height: 0.55, diameterTop: 0, diameterBottom: 0.35, tessellation: 4 }, this.scene);
-    tuft.material = grass;
-    tuft.isVisible = false;
+    const grassBladeA = MeshBuilder.CreatePlane('grassBladeSourceA', { width: 0.16, height: 0.62 }, this.scene);
+    grassBladeA.material = grass;
+    grassBladeA.isVisible = false;
+    const grassBladeB = MeshBuilder.CreatePlane('grassBladeSourceB', { width: 0.16, height: 0.62 }, this.scene);
+    grassBladeB.material = grass;
+    grassBladeB.isVisible = false;
     for (let i = 0; i < 72; i++) {
       const x = ((i * 37) % 120) - 60;
       const z = ((i * 53) % 245) - 18;
@@ -188,10 +215,14 @@ export class Environment3D {
       boulder.position = new Vector3(x, 0.55, z);
       boulder.scaling = new Vector3(0.55 + (i % 3) * 0.18, 0.45 + (i % 2) * 0.22, 0.65 + (i % 4) * 0.1);
       boulder.rotation = new Vector3(0.1 * (i % 4), i * 0.7, 0.15 * (i % 2));
-      const grassPatch = tuft.createInstance(`grass_${i}`);
-      grassPatch.position = new Vector3(x + (i % 2 ? 1.2 : -1.2), 0.28, z + 1);
-      grassPatch.rotation.y = i * 0.43;
-      grassPatch.scaling = new Vector3(1 + (i % 3) * 0.3, 1, 1 + (i % 2) * 0.25);
+      const grassX = x + (i % 2 ? 1.2 : -1.2);
+      const grassZ = z + 1;
+      const grassPatchA = grassBladeA.createInstance(`grassA_${i}`);
+      grassPatchA.position = new Vector3(grassX, 0.55, grassZ);
+      grassPatchA.rotation.y = i * 0.43;
+      const grassPatchB = grassBladeB.createInstance(`grassB_${i}`);
+      grassPatchB.position = new Vector3(grassX, 0.55, grassZ);
+      grassPatchB.rotation.y = i * 0.43 + Math.PI / 2;
     }
   }
 
@@ -204,11 +235,6 @@ export class Environment3D {
     moon.position = new Vector3(-58, 48, 190);
     moon.billboardMode = Mesh.BILLBOARDMODE_ALL;
     moon.material = amber;
-    for (let i = 0; i < 7; i++) {
-      const ridge = MeshBuilder.CreateCylinder(`mistMountain_${i}`, { height: 48 + i * 4, diameterTop: 0, diameterBottom: 45 + i * 8, tessellation: 5 }, this.scene);
-      ridge.position = new Vector3(-100 + i * 34, 14 + i * 2, 150 + (i % 2) * 55);
-      ridge.material = this.material(`mountainMat_${i}`, new Color3(0.12, 0.16, 0.17), new Color3(0.01, 0.02, 0.02));
-    }
   }
 
   private spawnAtmosphere() {

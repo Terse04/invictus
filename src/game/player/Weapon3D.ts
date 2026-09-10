@@ -70,9 +70,9 @@ export class Weapon3D {
     this.bladeMesh.position.y = 0.58;
 
     const bladeMat = new StandardMaterial('katanaBladeMat', scene);
-    bladeMat.diffuseColor = new Color3(0.9, 0.95, 1.0);
+    bladeMat.diffuseColor = new Color3(0.55, 0.95, 1.0);
     bladeMat.specularColor = new Color3(1, 1, 1);
-    bladeMat.emissiveColor = new Color3(0.18, 0.42, 0.20); // Ancient jade edge, not neon plasma
+    bladeMat.emissiveColor = Color3.FromHexString('#00f0ff');
     bladeMat.specularPower = 128;
     this.bladeMesh.material = bladeMat;
 
@@ -84,7 +84,7 @@ export class Weapon3D {
     }, scene);
     fuller.parent = this.bladeMesh;
     const fullerMat = new StandardMaterial('fullerMat', scene);
-    fullerMat.emissiveColor = new Color3(0.62, 0.52, 0.18);
+    fullerMat.emissiveColor = Color3.FromHexString('#00f0ff');
     fuller.material = fullerMat;
 
     // 4. Tsuba (Crossguard) - Ancient geometric octagonal plate

@@ -6,7 +6,9 @@ import {
   Color4,
   DirectionalLight,
   HemisphericLight,
-  ShadowGenerator
+  ShadowGenerator,
+  Camera,
+  DefaultRenderingPipeline
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 import { QualityProfile, resolveQuality } from './QualitySettings';
@@ -18,6 +20,7 @@ export class GameEngine {
   public dirLight: DirectionalLight;
   public hemiLight: HemisphericLight;
   public readonly quality: QualityProfile;
+  public renderingPipeline: DefaultRenderingPipeline | null = null;
   private handleResize: () => void;
   private handleContextLost: (e: Event) => void;
   private handleContextRestored: () => void;
@@ -52,27 +55,27 @@ export class GameEngine {
     this.engine.setHardwareScalingLevel(this.quality.hardwareScaling);
 
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.16, 0.22, 0.27, 1.0);
+    this.scene.clearColor = new Color4(0.12, 0.18, 0.22, 1.0);
 
     // Atmospheric 3D Exponential Fog for cinematic spatial depth
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.004;
-    this.scene.fogColor = new Color3(0.16, 0.22, 0.27);
+    this.scene.fogDensity = 0.0025;
+    this.scene.fogColor = new Color3(0.12, 0.18, 0.22);
 
     // Collisions setup
     this.scene.collisionsEnabled = true;
 
     // Ambient Celestial Hemispheric Light (Cool midnight blue ambient)
     this.hemiLight = new HemisphericLight('hemiLight', new Vector3(0, 1, 0), this.scene);
-    this.hemiLight.intensity = 0.7;
-    this.hemiLight.diffuse = new Color3(0.72, 0.82, 0.68);
-    this.hemiLight.groundColor = new Color3(0.10, 0.14, 0.10);
+    this.hemiLight.intensity = 0.85;
+    this.hemiLight.diffuse = new Color3(0.85, 0.90, 0.95);
+    this.hemiLight.groundColor = new Color3(0.2, 0.25, 0.22);
 
     // Key Directional Moonlight (Crisp silvery light casting sharp shadows)
     this.dirLight = new DirectionalLight('dirLight', new Vector3(-0.5, -1.4, 0.8), this.scene);
     this.dirLight.position = new Vector3(35, 75, -35);
-    this.dirLight.intensity = 1.45;
-    this.dirLight.diffuse = new Color3(1.0, 0.84, 0.62);
+    this.dirLight.intensity = 1.6;
+    this.dirLight.diffuse = new Color3(1.0, 0.95, 0.85);
 
     // Dynamic Rim Light (Illuminates silhouette edges from behind)
     const rimLight = new DirectionalLight('rimLight', new Vector3(0.5, 0.6, -1.0), this.scene);
@@ -97,6 +100,22 @@ export class GameEngine {
       this.engine.resize();
     };
     window.addEventListener('resize', this.handleResize);
+  }
+
+  public configureRendering(camera: Camera) {
+    this.renderingPipeline?.dispose();
+    const pipeline = new DefaultRenderingPipeline('celestialRenderingPipeline', true, this.scene, [camera]);
+    pipeline.bloomEnabled = true;
+    pipeline.bloomThreshold = 0.7;
+    pipeline.bloomWeight = 0.35;
+    pipeline.bloomKernel = 64;
+    pipeline.bloomScale = 0.5;
+    pipeline.samples = this.quality.level === 'low' ? 1 : 4;
+    pipeline.fxaaEnabled = this.quality.level !== 'low';
+    pipeline.imageProcessingEnabled = true;
+    pipeline.imageProcessing.contrast = 1.0;
+    pipeline.imageProcessing.exposure = 1.15;
+    this.renderingPipeline = pipeline;
   }
 
   public dispose() {

@@ -1,6 +1,7 @@
 import {
   Scene,
   Vector3,
+  Vector2,
   Color3
 } from '@babylonjs/core';
 import { Player3D } from '../player/Player3D';
@@ -56,13 +57,15 @@ export class CombatManager3D {
       if (enemy.isDead) continue;
 
       const toEnemy = enemy.rootMesh.position.subtract(req.origin);
-      const dist = toEnemy.length();
-      const bladeDist = this.distanceToBlade(enemy.rootMesh.position.add(new Vector3(0, 0.8, 0)), req.bladeRoot, req.bladeTip);
+      const horizontalDist = new Vector2(toEnemy.x, toEnemy.z).length();
+      const heightDiff = Math.abs(enemy.rootMesh.position.y - req.origin.y);
 
-      if (dist <= req.range && bladeDist <= 1.35) {
-        // Forward sector check (dot product > 0.3)
-        const forwardDot = Vector3.Dot(toEnemy.normalize(), req.direction);
-        if (forwardDot > 0.25 || dist < 1.4) {
+      if (horizontalDist <= req.range && heightDiff < 2.5) {
+        const horizontalDirection = new Vector3(toEnemy.x, 0, toEnemy.z);
+        const forwardDot = horizontalDirection.lengthSquared() > 0.0001
+          ? Vector3.Dot(horizontalDirection.normalize(), req.direction)
+          : 1;
+        if (forwardDot > 0.15 || horizontalDist < 1.6) {
           const isCrit = Math.random() < 0.28 || req.isHeavy;
           enemy.takeDamage(req.damage, isCrit);
           this.registerHit(req.damage * (isCrit ? 1.5 : 1.0));
@@ -179,14 +182,6 @@ export class CombatManager3D {
   }
 
   public isHitPaused() { return performance.now() < this.hitPauseUntil; }
-
-  private distanceToBlade(point: Vector3, root: Vector3, tip: Vector3) {
-    const segment = tip.subtract(root);
-    const lengthSq = segment.lengthSquared();
-    if (lengthSq < 0.0001) return Vector3.Distance(point, root);
-    const t = Math.max(0, Math.min(1, Vector3.Dot(point.subtract(root), segment) / lengthSq));
-    return Vector3.Distance(point, root.add(segment.scale(t)));
-  }
 
   private registerHit(damage: number) {
     this.comboCount++;

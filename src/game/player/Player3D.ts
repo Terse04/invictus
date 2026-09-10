@@ -75,6 +75,8 @@ export class Player3D {
   private stridePhase = 0;
   private idleTime = 0;
   private shiftPressedAt = 0;
+  private lastSafeGroundedPosition = new Vector3(0, 0, -5);
+  private hasAppliedAttackStep = false;
 
   // Abilities
   public waveAbilityUnlocked = false;
@@ -125,6 +127,7 @@ export class Player3D {
     this.rootMesh.ellipsoid = new Vector3(0.42, 0.92, 0.42);
     this.rootMesh.ellipsoidOffset = new Vector3(0, 0.92, 0);
     this.rootMesh.visibility = 0;
+    this.lastSafeGroundedPosition.copyFrom(spawnPos);
 
     // 2. Build Sculpted Cyber-Fantasy Warrior Anatomy
     this.buildCharacterHierarchy(scene);
@@ -146,20 +149,20 @@ export class Player3D {
     // --- Premium Materials ---
     // Obsidian Carbon Armor
     const armorMat = new StandardMaterial('warriorArmorMat', scene);
-    armorMat.diffuseColor = new Color3(0.08, 0.11, 0.16);
+    armorMat.diffuseColor = Color3.FromHexString('#0f172a');
     armorMat.specularColor = new Color3(0.4, 0.6, 0.8);
-    armorMat.specularPower = 64;
+    armorMat.specularPower = 32;
 
     // Restrained jade embroidery and ancient circuit trim
     const circuitMat = new StandardMaterial('warriorCircuitMat', scene);
-    circuitMat.diffuseColor = new Color3(0.03, 0.16, 0.10);
-    circuitMat.emissiveColor = new Color3(0.04, 0.38, 0.17);
+    circuitMat.diffuseColor = new Color3(0.01, 0.16, 0.20);
+    circuitMat.emissiveColor = Color3.FromHexString('#00f0ff');
     circuitMat.specularColor = new Color3(0.55, 0.72, 0.54);
 
     // Imperial Gold Accents
     const goldMat = new StandardMaterial('warriorGoldMat', scene);
-    goldMat.diffuseColor = new Color3(0.85, 0.68, 0.2);
-    goldMat.emissiveColor = new Color3(0.25, 0.18, 0.05);
+    goldMat.diffuseColor = new Color3(0.02, 0.22, 0.28);
+    goldMat.emissiveColor = new Color3(0, 0.56, 0.62);
 
     // Porcelain Anime Skin
     const skinMat = new StandardMaterial('warriorSkinMat', scene);
@@ -207,7 +210,7 @@ export class Player3D {
       height: 0.44,
       diameterTop: 0.46,
       diameterBottom: 0.32,
-      tessellation: 8
+      tessellation: 16
     }, scene);
     cuirass.parent = this.chestNode;
     cuirass.position.y = 0.14;
@@ -527,15 +530,24 @@ export class Player3D {
   }
 
   private handleGravity(dt: number) {
-    // Raycast down to find ground
-    const ray = new Ray(this.rootMesh.position.add(new Vector3(0, 0.5, 0)), Vector3.Down(), 1.6);
+    const ray = new Ray(this.rootMesh.position.add(new Vector3(0, 1.2, 0)), Vector3.Down(), 4.0);
     const hit = this.scene.pickWithRay(ray, (m) => m.checkCollisions && m !== this.rootMesh);
 
     if (hit && hit.hit && hit.pickedPoint) {
       const targetY = hit.pickedPoint.y;
-      if (this.rootMesh.position.y <= targetY + 0.1 && this.verticalVelocity <= 0) {
+      if (targetY <= -1.5) {
+        this.restoreSafeGroundedPosition();
+        return;
+      }
+      if (this.rootMesh.position.y < targetY) {
         this.rootMesh.position.y = targetY;
         this.verticalVelocity = 0;
+        this.isGrounded = true;
+        this.lastSafeGroundedPosition.copyFrom(this.rootMesh.position);
+      } else if (this.rootMesh.position.y <= targetY + 0.14 && this.verticalVelocity <= 0) {
+        this.rootMesh.position.y = targetY;
+        this.verticalVelocity = 0;
+        this.lastSafeGroundedPosition.copyFrom(this.rootMesh.position);
 
         if (!this.isGrounded) {
           // Landing impact
@@ -560,6 +572,19 @@ export class Player3D {
         this.animState = 'airborne';
       }
     }
+
+    if (this.rootMesh.position.y < -4.0) {
+      this.restoreSafeGroundedPosition();
+    }
+  }
+
+  private restoreSafeGroundedPosition() {
+    this.rootMesh.position.copyFrom(this.lastSafeGroundedPosition);
+    this.verticalVelocity = 0;
+    this.isGrounded = true;
+    this.animState = 'land';
+    this.stateTimer = 120;
+    this.camera.shake(0.18, 160);
   }
 
   private handleMovement(dt: number) {
@@ -745,10 +770,11 @@ export class Player3D {
         this.spineNode.rotation.y = (progress - 0.5) * 1.8;
         this.rightShoulderNode.rotation = new Vector3(0.2, -1.2 + progress * 2.4, -0.2);
         this.rightElbowNode.rotation.x = 0.3 + swing * 0.4;
-        if (progress > 0.42 && !this.hasCheckedHitThisAttack) {
+        if (progress >= 0.35 && progress <= 0.65 && !this.hasCheckedHitThisAttack) {
           this.hasCheckedHitThisAttack = true;
           this.onAttackHitCheck?.(false, 28);
         }
+        this.applyAttackStep(progress, 0.25);
         break;
       }
 
@@ -760,10 +786,11 @@ export class Player3D {
         this.spineNode.rotation.y = (0.5 - progress) * 1.6;
         this.rightShoulderNode.rotation = new Vector3(1.2 - progress * 2.2, 0.4, -0.4);
         this.rightElbowNode.rotation.x = 0.4 + swing * 0.5;
-        if (progress > 0.42 && !this.hasCheckedHitThisAttack) {
+        if (progress >= 0.35 && progress <= 0.65 && !this.hasCheckedHitThisAttack) {
           this.hasCheckedHitThisAttack = true;
           this.onAttackHitCheck?.(false, 34);
         }
+        this.applyAttackStep(progress, 0.25);
         break;
       }
 
@@ -781,10 +808,11 @@ export class Player3D {
           this.rightElbowNode.rotation.x = 0.2;
           this.spineNode.rotation.x = 0.35;
           this.hipsNode.position.y = 0.82;
-          if (!this.hasCheckedHitThisAttack) {
+          if (progress <= 0.65 && !this.hasCheckedHitThisAttack) {
             this.hasCheckedHitThisAttack = true;
             this.onAttackHitCheck?.(true, 56);
           }
+          this.applyAttackStep(progress, 0.32);
         }
         break;
       }
@@ -814,12 +842,19 @@ export class Player3D {
     }
   }
 
+  private applyAttackStep(progress: number, distance: number) {
+    if (this.hasAppliedAttackStep || progress < 0.35) return;
+    this.hasAppliedAttackStep = true;
+    this.rootMesh.moveWithCollisions(this.rootMesh.forward.scale(distance));
+  }
+
   // --- Combat Action Triggers ---
   public triggerLightAttack() {
     if (this.isDead || this.isDodging || this.controlsLocked) return;
 
     this.sheathTimer = 0;
     this.hasCheckedHitThisAttack = false;
+    this.hasAppliedAttackStep = false;
     this.weapon.drawWeapon();
 
     this.isAttacking = true;
@@ -861,6 +896,7 @@ export class Player3D {
   public triggerHeavyAttackInstant() {
     this.sheathTimer = 0;
     this.hasCheckedHitThisAttack = false;
+    this.hasAppliedAttackStep = false;
     this.weapon.drawWeapon();
 
     this.isAttacking = true;

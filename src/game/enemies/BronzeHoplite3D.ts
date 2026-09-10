@@ -13,13 +13,13 @@ export class BronzeHoplite3D extends EnemyBase3D {
     const rig = new TransformNode('bronzeHopliteRig', scene); rig.parent = this.rootMesh;
     const bronze = new StandardMaterial('hopliteBronze', scene); bronze.diffuseColor = new Color3(0.28, 0.16, 0.06); bronze.specularColor = new Color3(0.75, 0.48, 0.18);
     const oracle = new StandardMaterial('hopliteOracleCore', scene); oracle.emissiveColor = new Color3(0.38, 0.16, 0.68); oracle.disableLighting = true;
-    const torso = MeshBuilder.CreateCylinder('hopliteCuirass', { height: 1.24, diameterTop: 0.86, diameterBottom: 0.72, tessellation: 10 }, scene); torso.parent = rig; torso.position.y = 1.3; torso.material = bronze;
-    const helm = MeshBuilder.CreateSphere('hopliteHelmet', { diameter: 0.72, segments: 10 }, scene); helm.parent = rig; helm.position.y = 2.16; helm.material = bronze;
+    const torso = MeshBuilder.CreateCylinder('hopliteCuirass', { height: 1.24, diameterTop: 0.86, diameterBottom: 0.72, tessellation: 16 }, scene); torso.parent = rig; torso.position.y = 1.3; torso.material = bronze;
+    const helm = MeshBuilder.CreateSphere('hopliteHelmet', { diameter: 0.72, segments: 16 }, scene); helm.parent = rig; helm.position.y = 2.16; helm.material = bronze;
     const plume = MeshBuilder.CreateBox('hopliteOraclePlume', { width: 0.16, height: 0.7, depth: 0.42 }, scene); plume.parent = rig; plume.position = new Vector3(0, 2.56, -0.05); plume.material = oracle;
     const shield = MeshBuilder.CreateDisc('hopliteAegis', { radius: 0.72, tessellation: 16 }, scene); shield.parent = rig; shield.position = new Vector3(-0.72, 1.38, 0.38); shield.rotation.y = -0.22; shield.material = bronze;
-    const core = MeshBuilder.CreateSphere('hopliteBrokenOracle', { diameter: 0.32, segments: 8 }, scene); core.parent = rig; core.position = new Vector3(0, 1.4, 0.47); core.material = oracle;
-    const spear = MeshBuilder.CreateCylinder('hopliteSpear', { height: 2.6, diameter: 0.065, tessellation: 6 }, scene); spear.parent = rig; spear.position = new Vector3(0.62, 1.2, 0.3); spear.rotation.x = Math.PI / 3.5; spear.material = bronze;
-    [-0.27, 0.27].forEach(x => { const leg = MeshBuilder.CreateCylinder(`hopliteLeg_${x}`, { height: 0.85, diameter: 0.2, tessellation: 6 }, scene); leg.parent = rig; leg.position = new Vector3(x, 0.44, 0); leg.material = bronze; });
+    const core = MeshBuilder.CreateSphere('hopliteBrokenOracle', { diameter: 0.32, segments: 16 }, scene); core.parent = rig; core.position = new Vector3(0, 1.4, 0.47); core.material = oracle;
+    const spear = MeshBuilder.CreateCylinder('hopliteSpear', { height: 2.6, diameter: 0.065, tessellation: 16 }, scene); spear.parent = rig; spear.position = new Vector3(0.62, 1.2, 0.3); spear.rotation.x = Math.PI / 3.5; spear.material = bronze;
+    [-0.27, 0.27].forEach(x => { const leg = MeshBuilder.CreateCylinder(`hopliteLeg_${x}`, { height: 0.85, diameter: 0.2, tessellation: 16 }, scene); leg.parent = rig; leg.position = new Vector3(x, 0.44, 0); leg.material = bronze; });
   }
 
   protected override chasePlayer(delta: number) {
