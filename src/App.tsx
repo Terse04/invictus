@@ -10,6 +10,7 @@ import { VictoryModal } from './components/VictoryModal';
 import { OrientationNotice } from './components/OrientationNotice';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { StartScreen } from './components/StartScreen';
+import { loadProgress, saveProgress } from './utils/storage';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -20,13 +21,14 @@ export const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [currentChapter, setCurrentChapter] = useState<1 | 2>(() => loadProgress().selectedChapter);
 
   // Initialize Babylon.js 3D Game
   useEffect(() => {
     if (!hasStarted) return;
     if (canvasRef.current && !gameRef.current) {
       try {
-        gameRef.current = new Game3D(canvasRef.current);
+        gameRef.current = new Game3D(canvasRef.current, currentChapter);
       } catch (err: any) {
         console.error('[App] Failed to initialize 3D game engine:', err);
         setEngineError(err?.message || 'Failed to initialize WebGL graphics context.');
@@ -55,6 +57,10 @@ export const App: React.FC = () => {
 
     // Victory listener
     const unsubVictory = GameBridge.on('victory', (payload: VictoryPayload) => {
+      if (currentChapter === 1) {
+        const progress = loadProgress();
+        saveProgress({ ...progress, unlockedChapter2: true });
+      }
       setVictoryData(payload);
     });
 
@@ -81,7 +87,7 @@ export const App: React.FC = () => {
         gameRef.current = null;
       }
     };
-  }, [hasStarted]);
+  }, [hasStarted, currentChapter]);
 
   useEffect(() => {
     if (hasStarted) return;
@@ -103,7 +109,20 @@ export const App: React.FC = () => {
     setIsPaused(true);
   };
 
-  const handleStart = () => setHasStarted(true);
+  const handleStartChapter = (chapter: 1 | 2) => {
+    const progress = loadProgress();
+    saveProgress({ ...progress, selectedChapter: chapter });
+    setCurrentChapter(chapter);
+    setHasStarted(true);
+  };
+
+  const handleProceedToChapter2 = () => {
+    const progress = loadProgress();
+    saveProgress({ ...progress, unlockedChapter2: true, selectedChapter: 2 });
+    setVictoryData(null);
+    setIsPaused(false);
+    setCurrentChapter(2);
+  };
 
   const handleResume = () => {
     setIsPaused(false);
@@ -122,7 +141,7 @@ export const App: React.FC = () => {
     <ErrorBoundary>
       <div className="relative w-full h-full overflow-hidden bg-[#070b12]">
         {!hasStarted ? (
-          <StartScreen onStart={handleStart} />
+          <StartScreen onStartChapter={handleStartChapter} />
         ) : (
           <>
         {/* Real Babylon.js 3D Canvas */}
@@ -181,6 +200,8 @@ export const App: React.FC = () => {
         <VictoryModal
           data={victoryData}
           onRestart={handleRestart}
+          chapter={currentChapter}
+          onProceedToChapter2={handleProceedToChapter2}
         />
 
         <OrientationNotice />

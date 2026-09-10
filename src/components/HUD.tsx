@@ -9,12 +9,14 @@ export const HUD: React.FC<HUDProps> = ({ onPause }) => {
   const [ghostHp, setGhostHp] = useState(120);
   const [abilityCd, setAbilityCd] = useState({ current: 0, max: 6000 });
   const [toast, setToast] = useState<ToastPayload | null>(null);
+  const [objective, setObjective] = useState('✦ Traverse the Realm');
 
   useEffect(() => {
     const statsOff = GameBridge.on('player_stats', (value: PlayerStats) => { setStats(value); window.setTimeout(() => setGhostHp(value.hp), 420); });
     const cdOff = GameBridge.on('ability_cooldown', (value: { current: number; max: number }) => setAbilityCd(value));
     const toastOff = GameBridge.on('toast_message', (value: ToastPayload) => { setToast(value); window.setTimeout(() => setToast(current => current === value ? null : current), 3200); });
-    return () => { statsOff(); cdOff(); toastOff(); };
+    const objOff = GameBridge.on('objective_update', (value: { text: string }) => setObjective(value.text));
+    return () => { statsOff(); cdOff(); toastOff(); objOff(); };
   }, []);
 
   const hp = Math.max(0, Math.min(100, stats.hp / stats.maxHp * 100));
@@ -32,7 +34,7 @@ export const HUD: React.FC<HUDProps> = ({ onPause }) => {
         <div className="h-1 mt-1.5 rounded-full overflow-hidden bg-black/40"><div className="h-full bg-gradient-to-r from-emerald-800 to-emerald-300" style={{ width: `${stamina}%` }} /></div>
         <div className="flex gap-2 mt-2">{[0, 1, 2].map(pip => <span key={pip} className={`w-1.5 h-1.5 rounded-full ${stats.ultimate >= (pip + 1) * 33 ? 'bg-amber-300' : 'bg-stone-700'}`} />)}</div>
       </div>
-      <div className="arpg-objective">✦ Traverse the Celestial Sanctuary</div>
+      <div className="arpg-objective">{objective}</div>
       <button onClick={onPause} className="pointer-events-auto arpg-pause" title="Pause (Esc)"><Pause className="w-4 h-4" /></button>
     </div>
 

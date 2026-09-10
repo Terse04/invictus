@@ -1,4 +1,4 @@
-import { Vector3 } from '@babylonjs/core';
+import { Color3, Vector3 } from '@babylonjs/core';
 import { GameEngine } from './Engine';
 import { ThirdPersonCamera } from './camera/ThirdPersonCamera';
 import { Player3D } from './player/Player3D';
@@ -32,17 +32,28 @@ export class Game3D {
 
   private isDisposed = false;
   private isPaused = false;
+  private foundryVictoryEmitted = false;
+  public readonly chapter: 1 | 2;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, chapter: 1 | 2 = 1) {
+    this.chapter = chapter;
     // 1. Initialize Babylon.js 3D Engine & Scene
     this.engine = new GameEngine(canvas);
+    if (chapter === 2) {
+      this.engine.dirLight.intensity = 1.5;
+      this.engine.dirLight.diffuse = Color3.FromHexString('#ff8833');
+      this.engine.hemiLight.groundColor = Color3.FromHexString('#1a0f0a');
+      this.engine.hemiLight.diffuse = Color3.FromHexString('#3d1a10');
+      this.engine.scene.fogColor = Color3.FromHexString('#1e0c08');
+      this.engine.scene.fogDensity = 0.003;
+    }
 
     // 2. Systems
     this.telegraph = new Telegraph3D(this.engine.scene);
     this.particles = new ParticleVFX3D(this.engine.scene);
 
     // 3. 3D Environment (Celestial Ruins)
-    this.environment = new Environment3D(this.engine.scene, this.engine.shadowGenerator, this.engine.quality);
+    this.environment = new Environment3D(this.engine.scene, this.engine.shadowGenerator, this.engine.quality, chapter);
 
     // 4. 3D Protagonist Lin Yun (Spawn in Zone 1: Awakening Terrace)
     const spawnPos = new Vector3(0, 0, -5);
@@ -127,6 +138,10 @@ export class Game3D {
       if (this.combatManager.vanguardBoss && !this.combatManager.vanguardBoss.isDead) {
         this.combatManager.vanguardBoss.update(delta);
       }
+      if (this.chapter === 2 && this.combatManager.vanguardBoss?.isDead && !this.foundryVictoryEmitted) {
+        this.foundryVictoryEmitted = true;
+        GameBridge.emit('victory', { timeElapsed: 180, maxCombo: 35, damageDealt: 3200, rank: 'S' });
+      }
 
       // Update Main Boss
       if (this.combatManager.shenlongBoss && !this.combatManager.shenlongBoss.isDead) {
@@ -137,15 +152,19 @@ export class Game3D {
     // 10. Start Ambient Procedural Soundtrack
     SoundManager.getInstance().startBGM('ambient');
 
-    // Welcome banner
+    // Welcome banner and objective
     GameBridge.emit('toast_message', {
-      title: '✦ CHAPTER I: THE CELESTIAL RUINS',
-      subtitle: 'Traverse the 3D ruins to uncover the mystery of the Transmutation',
+      title: chapter === 2 ? '✦ CHAPTER II: THE ABYSSAL FOUNDRY' : '✦ CHAPTER I: THE CELESTIAL RUINS',
+      subtitle: chapter === 2 ? 'Breach the subterranean crucible to sever the automated war-foundry' : 'Traverse the 3D ruins to uncover the mystery of the Transmutation',
       type: 'info'
+    });
+    GameBridge.emit('objective_update', {
+      text: chapter === 2 ? '✦ Quench the Molten Foundry Crucible' : '✦ Traverse the Celestial Sanctuary'
     });
   }
 
   private spawnEnemies() {
+    if (this.chapter === 2) { this.spawnFoundryEnemies(); return; }
     // Zone 1: the first enemy must establish the world’s transmuted identity.
     const revenant1 = new TerracottaRevenant3D(this.engine.scene, new Vector3(-4, 0, 4), this.player, this.telegraph, this.particles);
     const revenant2 = new TerracottaRevenant3D(this.engine.scene, new Vector3(4, 0, 6), this.player, this.telegraph, this.particles);
@@ -177,11 +196,42 @@ export class Game3D {
     );
   }
 
+  private spawnFoundryEnemies() {
+    const spawn = (type: 'revenant' | 'scarab' | 'hoplite', pos: Vector3) => {
+      const enemy = type === 'revenant' ? new TerracottaRevenant3D(this.engine.scene, pos, this.player, this.telegraph, this.particles)
+        : type === 'scarab' ? new CyberScarab3D(this.engine.scene, pos, this.player, this.telegraph, this.particles)
+          : new BronzeHoplite3D(this.engine.scene, pos, this.player, this.telegraph, this.particles);
+      enemy.applyFoundryPalette();
+      this.combatManager.enemies.push(enemy);
+    };
+    spawn('revenant', new Vector3(-4, 0, 18)); spawn('revenant', new Vector3(4, 0, 22));
+    spawn('revenant', new Vector3(-6, 0, 82)); spawn('revenant', new Vector3(6, 0, 86));
+    spawn('scarab', new Vector3(-3, 0, 94)); spawn('scarab', new Vector3(4, 0, 96)); spawn('hoplite', new Vector3(0, 0, 104));
+    const vulcan = new VanguardBoss3D(this.engine.scene, new Vector3(0, 0, 184), this.player, this.telegraph, this.particles, 'vulcan');
+    vulcan.applyFoundryPalette();
+    this.combatManager.vanguardBoss = vulcan;
+  }
+
   public restart() {
     this.player.hp = this.player.maxHp;
     this.player.rootMesh.position = new Vector3(0, 0, -5);
     this.player.isDead = false;
     this.player.animState = 'idle';
+    this.player.ultimate = 100;
+
+    // Clear and respawn enemies for the active chapter
+    this.combatManager.enemies.forEach(e => e.dispose());
+    this.combatManager.enemies = [];
+    if (this.combatManager.vanguardBoss) {
+      this.combatManager.vanguardBoss.dispose();
+      this.combatManager.vanguardBoss = null;
+    }
+    if (this.combatManager.shenlongBoss) {
+      this.combatManager.shenlongBoss.dispose();
+      this.combatManager.shenlongBoss = null;
+    }
+    this.foundryVictoryEmitted = false;
+    this.spawnEnemies();
 
     GameBridge.emit('boss_encounter', {
       active: false,

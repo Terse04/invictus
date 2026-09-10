@@ -12,7 +12,7 @@ import { Weapon3D } from './Weapon3D';
 import { ThirdPersonCamera } from '../camera/ThirdPersonCamera';
 import { GameBridge } from '../GameBridge';
 import { SoundManager } from '../audio/SoundManager';
-import { loadProgress } from '../../utils/storage';
+import { loadProgress, saveProgress } from '../../utils/storage';
 
 export type PlayerAnimState =
   | 'idle'
@@ -40,7 +40,7 @@ export class Player3D {
   public maxHp = 120;
   public stamina = 100;
   public maxStamina = 100;
-  public ultimate = 0;
+  public ultimate = 100;
   public maxUltimate = 100;
 
   // Movement parameters
@@ -113,8 +113,8 @@ export class Player3D {
     this.soundManager = SoundManager.getInstance();
 
     const progress = loadProgress();
-    this.waveAbilityUnlocked = progress.unlockedWaveAbility;
-    this.ultimateUnlocked = progress.unlockedUltimate;
+    this.waveAbilityUnlocked = true;
+    this.ultimateUnlocked = true;
 
     // 1. Root Collider Mesh (Invisible physical entity)
     this.rootMesh = MeshBuilder.CreateCapsule('playerCollider', {
@@ -663,11 +663,12 @@ export class Player3D {
     if (this.stateTimer > 0) {
       this.stateTimer -= delta;
       if (this.stateTimer <= 0) {
-        if (this.animState === 'land' || this.animState === 'dodge' || this.animState.startsWith('attack')) {
+        if (this.animState === 'land' || this.animState === 'dodge' || this.animState.startsWith('attack') || this.animState === 'heavy_release') {
           this.isAttacking = false;
           this.isDodging = false;
           this.isInvulnerable = false;
           this.animState = 'idle';
+          this.weapon.deactivateTrail();
         }
       }
     }
@@ -794,9 +795,11 @@ export class Player3D {
         break;
       }
 
-      case 'attack3': {
+      case 'attack3':
+      case 'heavy_release': {
         // Overhead Helm-Breaker
-        const progress = 1 - this.stateTimer / 440;
+        const duration = this.animState === 'heavy_release' ? 460 : 440;
+        const progress = 1 - this.stateTimer / duration;
         if (progress < 0.35) {
           // Anticipation lift
           this.rightShoulderNode.rotation = new Vector3(-1.6, 0.1, 0);
@@ -810,7 +813,7 @@ export class Player3D {
           this.hipsNode.position.y = 0.82;
           if (progress <= 0.65 && !this.hasCheckedHitThisAttack) {
             this.hasCheckedHitThisAttack = true;
-            this.onAttackHitCheck?.(true, 56);
+            this.onAttackHitCheck?.(true, this.animState === 'heavy_release' ? 72 : 56);
           }
           this.applyAttackStep(progress, 0.32);
         }
@@ -856,6 +859,7 @@ export class Player3D {
     this.hasCheckedHitThisAttack = false;
     this.hasAppliedAttackStep = false;
     this.weapon.drawWeapon();
+    this.weapon.activateTrail();
 
     this.isAttacking = true;
     this.comboIndex = (this.comboIndex % 3) + 1;
@@ -898,9 +902,10 @@ export class Player3D {
     this.hasCheckedHitThisAttack = false;
     this.hasAppliedAttackStep = false;
     this.weapon.drawWeapon();
+    this.weapon.activateTrail();
 
     this.isAttacking = true;
-    this.animState = 'attack3';
+    this.animState = 'heavy_release';
     this.stateTimer = 460;
     this.soundManager.playHeavyRelease();
     this.camera.shake(0.35, 240);
@@ -958,7 +963,16 @@ export class Player3D {
     this.triggerHeavyAttackInstant();
     this.onUltimateActivate?.();
     this.camera.shake(0.5, 450);
-    this.soundManager.playHeavyRelease();
+    this.soundManager.playUltimateFinisher();
+    GameBridge.emit('player_stats', {
+      hp: this.hp,
+      maxHp: this.maxHp,
+      stamina: this.stamina,
+      maxStamina: this.maxStamina,
+      ultimate: this.ultimate,
+      maxUltimate: this.maxUltimate,
+      shield: 0
+    });
     GameBridge.emit('toast_message', {
       title: '✦ CELESTIAL RESONANCE UNLEASHED',
       subtitle: 'Maximum harmonic frequency activated',
@@ -986,6 +1000,8 @@ export class Player3D {
 
   public unlockUltimate() {
     this.ultimateUnlocked = true;
+    const progress = loadProgress();
+    saveProgress({ ...progress, unlockedUltimate: true });
   }
 
   public addUltimateCharge(amount: number) {

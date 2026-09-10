@@ -23,6 +23,8 @@ export class Weapon3D {
   private scene: Scene;
   private handNode: TransformNode;
   private sheathNode: TransformNode;
+  private trailMaterial: StandardMaterial | null = null;
+  private trailFadeTimer: number | null = null;
 
   constructor(scene: Scene, handNode: TransformNode, sheathNode: TransformNode) {
     this.scene = scene;
@@ -136,7 +138,6 @@ export class Weapon3D {
     this.rootNode.position = new Vector3(0, -0.05, 0.08);
     this.rootNode.rotation = new Vector3(Math.PI / 2.2, 0, 0);
 
-    this.activateTrail();
   }
 
   public sheathWeapon() {
@@ -150,19 +151,38 @@ export class Weapon3D {
     this.rootNode.rotation = new Vector3(0, 0, 0);
   }
 
+  /** A short ribbon sampled from the moving blade, shown only during an attack swing. */
   public activateTrail() {
-    if (!this.trailMesh) {
-      this.trailMesh = new TrailMesh('weaponTrail', this.bladeMesh, this.scene, 0.45, 24, true);
-      const trailMat = new StandardMaterial('trailMat', this.scene);
-      trailMat.emissiveColor = new Color3(0.76, 0.62, 0.22);
-      trailMat.alpha = 0.62;
-      this.trailMesh.material = trailMat;
+    if (this.trailFadeTimer !== null) {
+      window.clearInterval(this.trailFadeTimer);
+      this.trailFadeTimer = null;
     }
+    if (!this.trailMesh) {
+      // The blade's hilt-to-tip span is the ribbon width; its motion supplies the arc.
+      this.trailMesh = new TrailMesh('weaponTrail', this.bladeMesh, this.scene, 0.45, 12, true);
+      this.trailMaterial = new StandardMaterial('trailMat', this.scene);
+      this.trailMaterial.emissiveColor = Color3.FromHexString('#00f0ff');
+      this.trailMaterial.disableLighting = true;
+      this.trailMesh.material = this.trailMaterial;
+    }
+    if (this.trailMaterial) this.trailMaterial.alpha = 0.82;
     this.trailMesh.isVisible = true;
   }
 
+  /** Fade the ribbon after the active hit window rather than leaving it on while sheathed. */
   public deactivateTrail() {
-    if (this.trailMesh) this.trailMesh.isVisible = false;
+    if (!this.trailMesh || !this.trailMaterial) return;
+    if (this.trailFadeTimer !== null) window.clearInterval(this.trailFadeTimer);
+    const start = performance.now();
+    this.trailFadeTimer = window.setInterval(() => {
+      const progress = Math.min(1, (performance.now() - start) / 180);
+      this.trailMaterial!.alpha = 0.82 * (1 - progress);
+      if (progress >= 1) {
+        this.trailMesh!.isVisible = false;
+        window.clearInterval(this.trailFadeTimer!);
+        this.trailFadeTimer = null;
+      }
+    }, 16);
   }
 
   public getWorldTipPosition(): Vector3 {
@@ -170,6 +190,7 @@ export class Weapon3D {
   }
 
   public dispose() {
+    if (this.trailFadeTimer !== null) window.clearInterval(this.trailFadeTimer);
     this.trailMesh?.dispose();
     this.bladeMesh.dispose();
     this.guardMesh.dispose();

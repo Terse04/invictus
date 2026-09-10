@@ -184,6 +184,8 @@ export class CombatManager3D {
   public isHitPaused() { return performance.now() < this.hitPauseUntil; }
 
   private registerHit(damage: number) {
+    // Every confirmed player hit feeds the ultimate meter.
+    this.player.addUltimateCharge(Math.max(6, Math.min(16, Math.round(damage / 7))));
     this.comboCount++;
     const rank = this.calculateRank(this.comboCount);
 

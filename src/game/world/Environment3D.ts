@@ -11,16 +11,19 @@ export class Environment3D {
   private readonly scene: Scene;
   private readonly shadows: ShadowGenerator;
   private readonly quality: QualityProfile;
+  private readonly chapter: 1 | 2;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator, quality: QualityProfile) {
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator, quality: QualityProfile, chapter: 1 | 2 = 1) {
     this.scene = scene;
     this.shadows = shadowGenerator;
     this.quality = quality;
+    this.chapter = chapter;
     this.buildSanctuary();
     this.spawnAtmosphere();
   }
 
   private buildSanctuary() {
+    if (this.chapter === 2) { this.buildAbyssalFoundry(); return; }
     const grass = this.material('terrainGrass', new Color3(0.13, 0.21, 0.14), new Color3(0.015, 0.03, 0.02));
     const path = this.material('weatheredPath', new Color3(0.28, 0.27, 0.21), new Color3(0.03, 0.025, 0.015));
     const stone = this.material('mossStone', new Color3(0.24, 0.28, 0.23), new Color3(0.015, 0.025, 0.015));
@@ -69,6 +72,31 @@ export class Environment3D {
 
     this.scatterNature(stone, grass);
     this.buildSky(amber);
+  }
+
+  private buildAbyssalFoundry() {
+    const basalt = this.material('foundryBasalt', Color3.FromHexString('#181517'), new Color3(0.006, 0.004, 0.004));
+    const bronze = this.material('foundryBronze', new Color3(0.23, 0.10, 0.035), new Color3(0.07, 0.018, 0.004));
+    const magma = this.material('foundryMagma', new Color3(0.34, 0.025, 0.002), Color3.FromHexString('#ff3b00'));
+    const ground = MeshBuilder.CreateGround('abyssalFoundryFloor', { width: 100, height: 250, subdivisions: 32 }, this.scene);
+    ground.position.z = 100; ground.material = basalt; ground.receiveShadows = true; ground.checkCollisions = true; this.groundMeshes.push(ground);
+    this.createSafetyBounds();
+    const road = MeshBuilder.CreateGround('foundryCauseway', { width: 10, height: 240 }, this.scene);
+    road.position = new Vector3(0, 0.04, 100); road.material = bronze; road.receiveShadows = true; this.groundMeshes.push(road);
+    [-6.2, 6.2].forEach(side => {
+      const conduit = MeshBuilder.CreateBox(`magmaConduit_${side}`, { width: 1.1, height: 0.16, depth: 238 }, this.scene);
+      conduit.position = new Vector3(side, 0.08, 100); conduit.material = magma;
+    });
+    [24, 80, 142, 192].forEach((z, index) => {
+      this.createTerrace(new Vector3(0, 0.22, z), index === 3 ? 48 : 25, 0.55, basalt, magma, index === 3);
+      [-1, 1].forEach(side => {
+        const pylon = MeshBuilder.CreateCylinder(`foundryPylon_${z}_${side}`, { height: 8, diameterTop: 0.45, diameterBottom: 1.2, tessellation: 12 }, this.scene);
+        pylon.position = new Vector3(side * 12, 4, z); pylon.material = bronze; this.shadows.addShadowCaster(pylon);
+        const exhaust = MeshBuilder.CreateSphere(`slagCauldron_${z}_${side}`, { diameter: 1.2, segments: 12 }, this.scene);
+        exhaust.position = new Vector3(side * 12, 1.1, z + 2); exhaust.material = magma;
+      });
+    });
+    this.buildSky(magma);
   }
 
   private createSafetyBounds() {
@@ -235,18 +263,65 @@ export class Environment3D {
     moon.position = new Vector3(-58, 48, 190);
     moon.billboardMode = Mesh.BILLBOARDMODE_ALL;
     moon.material = amber;
+
+    // Sparse distant ruins add mythic depth without expensive sky geometry or heavy particles.
+    const ruinStone = this.material('celestialRuinStone', new Color3(0.12, 0.17, 0.18), new Color3(0.012, 0.025, 0.026));
+    const runeStone = this.material('celestialRuinRune', new Color3(0.03, 0.13, 0.14), new Color3(0, 0.2, 0.19));
+    for (let i = 0; i < 7; i++) {
+      const root = new Mesh(`floatingSkyRuin_${i}`, this.scene);
+      const x = -46 + i * 15;
+      const y = 18 + (i % 4) * 7;
+      const z = 68 + i * 16;
+      root.position = new Vector3(x, y, z);
+      root.rotation = new Vector3((i % 2) * 0.12, i * 0.58, (i % 3 - 1) * 0.16);
+      root.metadata = { baseY: y, bobPhase: i * 0.91 };
+      this.floatingElements.push(root);
+
+      if (i % 2 === 0) {
+        const monolith = MeshBuilder.CreateBox(`skyMonolith_${i}`, { width: 1.4, height: 5.8, depth: 1.05 }, this.scene);
+        monolith.parent = root;
+        monolith.position.y = 0.6;
+        monolith.rotation.z = 0.18;
+        monolith.material = ruinStone;
+        const shard = MeshBuilder.CreateBox(`skyMonolithShard_${i}`, { width: 0.85, height: 2.0, depth: 0.8 }, this.scene);
+        shard.parent = root;
+        shard.position = new Vector3(0.95, -2.1, 0.2);
+        shard.rotation.z = -0.38;
+        shard.material = runeStone;
+      } else {
+        [-1, 1].forEach(side => {
+          const post = MeshBuilder.CreateCylinder(`skyToriiPost_${i}_${side}`, { height: 3.5, diameter: 0.38, tessellation: 10 }, this.scene);
+          post.parent = root;
+          post.position = new Vector3(side * 1.65, 0, 0);
+          post.material = ruinStone;
+        });
+        const lintel = MeshBuilder.CreateBox(`skyToriiLintel_${i}`, { width: 4.4, height: 0.35, depth: 0.6 }, this.scene);
+        lintel.parent = root;
+        lintel.position = new Vector3(0, 1.55, 0);
+        lintel.rotation.z = 0.11;
+        lintel.material = runeStone;
+      }
+    }
+    this.scene.onBeforeRenderObservable.add(() => {
+      const time = performance.now() * 0.001;
+      this.floatingElements.forEach(element => {
+        const metadata = element.metadata as { baseY: number; bobPhase: number };
+        element.position.y = metadata.baseY + Math.sin(time * 0.45 + metadata.bobPhase) * 0.65;
+      });
+    });
   }
 
   private spawnAtmosphere() {
     const motes = new ParticleSystem('windborneMotes', this.quality.particleCapacity, this.scene);
     motes.createPointEmitter(new Vector3(-50, 0, -20), new Vector3(50, 14, 235));
-    motes.color1 = new Color4(0.68, 0.78, 0.55, 0.55);
-    motes.color2 = new Color4(0.96, 0.69, 0.28, 0.38);
+    motes.color1 = this.chapter === 2 ? new Color4(1.0, 0.45, 0.1, 0.8) : new Color4(0.68, 0.78, 0.55, 0.55);
+    motes.color2 = this.chapter === 2 ? new Color4(1.0, 0.12, 0.02, 0.55) : new Color4(0.96, 0.69, 0.28, 0.38);
     motes.colorDead = new Color4(0, 0, 0, 0);
     motes.minSize = 0.025; motes.maxSize = 0.11;
     motes.minLifeTime = 4; motes.maxLifeTime = 8;
     motes.emitRate = this.quality.particleRate;
-    motes.direction1 = new Vector3(-0.2, 0.2, 0.1); motes.direction2 = new Vector3(0.2, 0.7, 0.5);
+    motes.direction1 = this.chapter === 2 ? new Vector3(-0.15, 1.1, -0.1) : new Vector3(-0.2, 0.2, 0.1);
+    motes.direction2 = this.chapter === 2 ? new Vector3(0.15, 2.0, 0.15) : new Vector3(0.2, 0.7, 0.5);
     motes.start();
   }
 }

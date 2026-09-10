@@ -39,6 +39,7 @@ export abstract class EnemyBase3D {
   protected hpBarMesh: Mesh;
   protected hpFillMesh: Mesh;
   protected isHovering = false;
+  private hitFlashTimer: number | null = null;
 
   constructor(
     scene: Scene,
@@ -150,13 +151,15 @@ export abstract class EnemyBase3D {
 
     this.particles.emitHitSparks(this.rootMesh.position.add(new Vector3(0, 1.0, 0)), undefined, 16);
     this.soundManager.playHit(isCrit);
+    this.flashVisualMaterials();
+    this.targetPlayer.camera.freezeTarget(50);
 
     // Directional knockback impulse away from player
     const away = this.rootMesh.position.subtract(this.targetPlayer.rootMesh.position);
     away.y = 0;
     if (away.lengthSquared() > 0.001) {
       away.normalize();
-      this.rootMesh.moveWithCollisions(away.scale(isCrit ? 1.4 : 0.7));
+      this.rootMesh.moveWithCollisions(away.scale(0.4));
     }
 
     this.poise -= finalDamage * 0.5;
@@ -179,6 +182,22 @@ export abstract class EnemyBase3D {
     }, 700);
   }
 
+  private flashVisualMaterials() {
+    if (this.hitFlashTimer !== null) window.clearTimeout(this.hitFlashTimer);
+    const originals = new Map<StandardMaterial, Color3>();
+    this.rootMesh.getChildMeshes(false).forEach(mesh => {
+      const material = mesh.material;
+      if (material instanceof StandardMaterial && !originals.has(material)) {
+        originals.set(material, material.emissiveColor.clone());
+        material.emissiveColor = new Color3(1, 1, 1);
+      }
+    });
+    this.hitFlashTimer = window.setTimeout(() => {
+      originals.forEach((emissive, material) => { material.emissiveColor = emissive; });
+      this.hitFlashTimer = null;
+    }, 70);
+  }
+
   protected updateHpBar() {
     const ratio = Math.max(0, this.hp / this.maxHp);
     this.hpFillMesh.scaling.x = ratio;
@@ -189,21 +208,37 @@ export abstract class EnemyBase3D {
   public die() {
     this.isDead = true;
     this.soundManager.playEnemyRoar();
-    this.particles.emitShockwave(this.rootMesh.position, 3.0);
-
-    let fade = 1.0;
+    const corePosition = this.rootMesh.position.add(new Vector3(0, 1.1, 0));
+    this.particles.emitShockwave(corePosition, 3.8, Color3.FromHexString('#00ff88'));
+    this.particles.emitHitSparks(corePosition, new Color3(0, 1, 0.53).toColor4(), 24);
+    this.hpBarMesh.isVisible = false;
+    const originalScale = this.rootMesh.scaling.clone();
+    const start = performance.now();
     const interval = window.setInterval(() => {
-      fade -= 0.05;
-      if (fade <= 0) {
+      const progress = Math.min(1, (performance.now() - start) / 450);
+      this.rootMesh.scaling.copyFrom(originalScale.scale(1 - progress));
+      if (progress >= 1) {
         clearInterval(interval);
         this.dispose();
       }
-    }, 30);
+    }, 16);
   }
 
   public dispose() {
+    if (this.hitFlashTimer !== null) window.clearTimeout(this.hitFlashTimer);
     this.hpFillMesh.dispose();
     this.hpBarMesh.dispose();
     this.rootMesh.dispose();
+  }
+
+  /** Chapter II palette hook for the existing procedural enemy rigs. */
+  public applyFoundryPalette() {
+    this.rootMesh.getChildMeshes(false).forEach(mesh => {
+      const material = mesh.material;
+      if (material instanceof StandardMaterial) {
+        material.diffuseColor = new Color3(0.16, 0.045, 0.02);
+        material.emissiveColor = Color3.FromHexString('#ff4400');
+      }
+    });
   }
 }

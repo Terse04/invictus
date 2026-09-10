@@ -14,6 +14,8 @@ export interface GameProgress {
   shenlongDefeated: boolean;
   highestCombo: number;
   bestClearTime: number | null;
+  unlockedChapter2: boolean;
+  selectedChapter: 1 | 2;
 }
 
 const SETTINGS_KEY = 'invictus_settings_v1';
@@ -29,12 +31,15 @@ export const defaultSettings: GameSettings = {
 };
 
 export const defaultProgress: GameProgress = {
-  unlockedWaveAbility: false,
-  unlockedUltimate: false,
+  unlockedWaveAbility: true,
+  unlockedUltimate: true,
   vanguardDefeated: false,
   shenlongDefeated: false,
   highestCombo: 0,
-  bestClearTime: null
+  bestClearTime: null,
+  // Chapter II is selectable so its biome can be tested directly.
+  unlockedChapter2: true,
+  selectedChapter: 1
 };
 
 export const loadSettings = (): GameSettings => {
@@ -59,7 +64,14 @@ export const loadProgress = (): GameProgress => {
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) return defaultProgress;
-    return { ...defaultProgress, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaultProgress,
+      ...parsed,
+      unlockedWaveAbility: true,
+      unlockedUltimate: true,
+      unlockedChapter2: parsed.unlockedChapter2 ?? true
+    };
   } catch {
     return defaultProgress;
   }

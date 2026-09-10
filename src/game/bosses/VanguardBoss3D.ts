@@ -18,15 +18,23 @@ export class VanguardBoss3D extends EnemyBase3D {
   private isBossActive = false;
   private attackPattern = 0;
   private halberdMesh: Mesh;
+  private readonly isVulcan: boolean;
 
   constructor(
     scene: Scene,
     spawnPos: Vector3,
     targetPlayer: Player3D,
     telegraph: Telegraph3D,
-    particles: ParticleVFX3D
+    particles: ParticleVFX3D,
+    variant: 'vanguard' | 'vulcan' = 'vanguard'
   ) {
     super(scene, spawnPos, ENEMY_CONFIGS.vanguardBoss, targetPlayer, telegraph, particles);
+    this.isVulcan = variant === 'vulcan';
+    if (this.isVulcan) {
+      this.config = { ...this.config, name: 'Archon Vulcan-01', maxHp: 3200, damage: 40, attackCooldown: 1450 };
+      this.maxHp = 3200;
+      this.hp = 3200;
+    }
 
     const bossNode = new TransformNode('vanguardNode', scene);
     bossNode.parent = this.rootMesh;
@@ -52,7 +60,7 @@ export class VanguardBoss3D extends EnemyBase3D {
     core.position = new Vector3(0, 1.8, 0.58);
 
     const coreMat = new StandardMaterial('vanguardCoreMat', scene);
-    coreMat.emissiveColor = new Color3(0.0, 0.95, 1.0); // Cyan thunder energy
+    coreMat.emissiveColor = this.isVulcan ? Color3.FromHexString('#ff3b00') : new Color3(0.0, 0.95, 1.0);
     core.material = coreMat;
 
     // Helm & Crest
@@ -92,7 +100,7 @@ export class VanguardBoss3D extends EnemyBase3D {
     this.halberdMesh.rotation.x = Math.PI / 4;
 
     const halberdMat = new StandardMaterial('vanguardHalberdMat', scene);
-    halberdMat.emissiveColor = new Color3(1.0, 0.85, 0.2);
+    halberdMat.emissiveColor = this.isVulcan ? Color3.FromHexString('#ff4400') : new Color3(1.0, 0.85, 0.2);
     this.halberdMesh.material = halberdMat;
   }
 
@@ -119,8 +127,8 @@ export class VanguardBoss3D extends EnemyBase3D {
     this.particles.emitShockwave(this.rootMesh.position, 6.0);
 
     GameBridge.emit('toast_message', {
-      title: '⚠️ BOSS ENCOUNTER: CENTURION LEI-GUAN',
-      subtitle: 'Guardian of the Thunder Gate engages combat protocols',
+      title: this.isVulcan ? '⚠️ BOSS ENCOUNTER: ARCHON VULCAN-01' : '⚠️ BOSS ENCOUNTER: CENTURION LEI-GUAN',
+      subtitle: this.isVulcan ? 'Sovereign of the Molten Crucible engages combat protocols' : 'Guardian of the Thunder Gate engages combat protocols',
       type: 'alert'
     });
   }
@@ -128,8 +136,8 @@ export class VanguardBoss3D extends EnemyBase3D {
   private syncBossBar() {
     GameBridge.emit('boss_encounter', {
       active: true,
-      name: 'CENTURION LEI-GUAN',
-      subtitle: 'Guardian of the Thunder Gate',
+      name: this.isVulcan ? 'ARCHON VULCAN-01' : 'CENTURION LEI-GUAN',
+      subtitle: this.isVulcan ? 'Sovereign of the Molten Crucible' : 'Guardian of the Thunder Gate',
       phase: 1,
       maxPhases: 1,
       hp: this.hp,

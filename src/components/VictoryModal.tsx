@@ -5,9 +5,11 @@ import { Trophy, RotateCcw, Sparkles } from 'lucide-react';
 interface VictoryModalProps {
   data: VictoryPayload | null;
   onRestart: () => void;
+  chapter: 1 | 2;
+  onProceedToChapter2: () => void;
 }
 
-export const VictoryModal: React.FC<VictoryModalProps> = ({ data, onRestart }) => {
+export const VictoryModal: React.FC<VictoryModalProps> = ({ data, onRestart, chapter, onProceedToChapter2 }) => {
   if (!data) return null;
 
   return (
@@ -23,10 +25,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({ data, onRestart }) =
             <Trophy className="w-8 h-8 animate-bounce" />
           </div>
           <h1 className="text-3xl font-cinzel font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-cyan-300">
-            VERTICAL SLICE COMPLETE
+            {chapter === 2 ? 'THE SOVEREIGN FOUNDRY QUENCHED' : 'CHAPTER I COMPLETE'}
           </h1>
           <p className="text-sm font-cinzel text-slate-300 tracking-wider">
-            CHAPTER I: CONVERGENCE OF JADE & CIRCUIT
+            {chapter === 2 ? 'CHAPTER II: THE ABYSSAL FOUNDRY' : 'CHAPTER I: CONVERGENCE OF JADE & CIRCUIT'}
           </p>
         </div>
 
@@ -69,14 +71,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({ data, onRestart }) =
           "Shenlong-09's core subsides into serene harmonic resonance. The Celestial Ruins fall quiet, but far beyond the western crags, the Greek and Egyptian sectors begin to stir..."
         </p>
 
-        {/* Button */}
-        <button
-          onClick={onRestart}
-          className="px-8 py-3 rounded-lg bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-cinzel font-black tracking-widest text-sm shadow-xl flex items-center space-x-2 mx-auto transition-all transform hover:scale-105"
-        >
-          <RotateCcw className="w-5 h-5" />
-          <span>REPLAY VERTICAL SLICE</span>
-        </button>
+        <div className="flex flex-wrap gap-3 justify-center"><button onClick={onRestart} className="px-6 py-3 rounded-lg border border-amber-300 text-amber-200 font-cinzel font-bold tracking-wider text-xs flex items-center gap-2"><RotateCcw className="w-4 h-4" /><span>{chapter === 1 ? 'REPLAY CHAPTER I' : 'REPLAY CHAPTER II'}</span></button>{chapter === 1 && <button onClick={onProceedToChapter2} className="px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-300 to-teal-400 text-slate-950 font-cinzel font-black tracking-wider text-xs flex items-center gap-2"><Sparkles className="w-4 h-4" /><span>PROCEED TO CHAPTER II</span></button>}</div>
       </div>
     </div>
   );
