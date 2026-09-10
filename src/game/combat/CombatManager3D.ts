@@ -13,6 +13,8 @@ import { SoundManager } from '../audio/SoundManager';
 
 export interface AttackRequest {
   origin: Vector3;
+  bladeRoot: Vector3;
+  bladeTip: Vector3;
   direction: Vector3;
   range: number;
   damage: number;
@@ -34,7 +36,7 @@ export class CombatManager3D {
   // Combo system
   public comboCount = 0;
   private comboResetTimeout: number | null = null;
-  private isHitPaused = false;
+  private hitPauseUntil = 0;
 
   constructor(scene: Scene, player: Player3D, particles: ParticleVFX3D) {
     this.scene = scene;
@@ -55,8 +57,9 @@ export class CombatManager3D {
 
       const toEnemy = enemy.rootMesh.position.subtract(req.origin);
       const dist = toEnemy.length();
+      const bladeDist = this.distanceToBlade(enemy.rootMesh.position.add(new Vector3(0, 0.8, 0)), req.bladeRoot, req.bladeTip);
 
-      if (dist <= req.range) {
+      if (dist <= req.range && bladeDist <= 1.35) {
         // Forward sector check (dot product > 0.3)
         const forwardDot = Vector3.Dot(toEnemy.normalize(), req.direction);
         if (forwardDot > 0.25 || dist < 1.4) {
@@ -171,13 +174,17 @@ export class CombatManager3D {
 
   // Hit Pause (Frame Freeze)
   private triggerHitPause(ms: number) {
-    if (this.isHitPaused) return;
-    this.isHitPaused = true;
+    this.hitPauseUntil = Math.max(this.hitPauseUntil, performance.now() + ms);
+  }
 
-    // Slight slow down / pause effect
-    window.setTimeout(() => {
-      this.isHitPaused = false;
-    }, ms);
+  public isHitPaused() { return performance.now() < this.hitPauseUntil; }
+
+  private distanceToBlade(point: Vector3, root: Vector3, tip: Vector3) {
+    const segment = tip.subtract(root);
+    const lengthSq = segment.lengthSquared();
+    if (lengthSq < 0.0001) return Vector3.Distance(point, root);
+    const t = Math.max(0, Math.min(1, Vector3.Dot(point.subtract(root), segment) / lengthSq));
+    return Vector3.Distance(point, root.add(segment.scale(t)));
   }
 
   private registerHit(damage: number) {

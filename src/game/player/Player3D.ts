@@ -56,11 +56,14 @@ export class Player3D {
   public animState: PlayerAnimState = 'idle';
   public isInvulnerable = false;
   public isDodging = false;
+  public isSprinting = false;
   public isAttacking = false;
   public isChargingHeavy = false;
   public isDead = false;
   public comboIndex = 0;
   public onAttackHitCheck: ((isHeavy: boolean, damage: number) => void) | null = null;
+  public onWaveActivate: (() => void) | null = null;
+  public onUltimateActivate: (() => void) | null = null;
   private hasCheckedHitThisAttack = false;
 
   // Timers
@@ -69,6 +72,7 @@ export class Player3D {
   private sheathTimer = 0;
   private stridePhase = 0;
   private idleTime = 0;
+  private shiftPressedAt = 0;
 
   // Abilities
   public waveAbilityUnlocked = false;
@@ -144,11 +148,11 @@ export class Player3D {
     armorMat.specularColor = new Color3(0.4, 0.6, 0.8);
     armorMat.specularPower = 64;
 
-    // Luminous Jade-Cyan Circuit Trims
+    // Restrained jade embroidery and ancient circuit trim
     const circuitMat = new StandardMaterial('warriorCircuitMat', scene);
-    circuitMat.diffuseColor = new Color3(0.02, 0.18, 0.22);
-    circuitMat.emissiveColor = new Color3(0.0, 0.85, 0.95);
-    circuitMat.specularColor = new Color3(0.8, 1.0, 1.0);
+    circuitMat.diffuseColor = new Color3(0.03, 0.16, 0.10);
+    circuitMat.emissiveColor = new Color3(0.04, 0.38, 0.17);
+    circuitMat.specularColor = new Color3(0.55, 0.72, 0.54);
 
     // Imperial Gold Accents
     const goldMat = new StandardMaterial('warriorGoldMat', scene);
@@ -390,27 +394,30 @@ export class Player3D {
   private initInputs() {
     window.addEventListener('keydown', (e) => {
       this.inputKeys[e.key.toLowerCase()] = true;
-      if (e.key.toLowerCase() === 'j') this.triggerLightAttack();
-      if (e.key.toLowerCase() === 'k') this.startChargingHeavy();
-      if (e.code === 'Space') this.triggerJumpOrDodge();
-      if (e.key.toLowerCase() === 'e') this.triggerWaveAbility();
-      if (e.key.toLowerCase() === 'q') this.triggerUltimate();
+      if (!this.isDesktopGameplayInput()) return;
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        this.triggerJump();
+      }
+      if (e.key === 'Shift' && !e.repeat) this.shiftPressedAt = performance.now();
+      if (e.key.toLowerCase() === 'e' && !e.repeat) this.triggerWaveAbility();
+      if (e.key.toLowerCase() === 'q' && !e.repeat) this.triggerUltimate();
+      if (e.key.toLowerCase() === 'f' && !e.repeat) GameBridge.emit('interact_request');
     });
 
     window.addEventListener('keyup', (e) => {
       this.inputKeys[e.key.toLowerCase()] = false;
-      if (e.key.toLowerCase() === 'k' && this.isChargingHeavy) {
-        this.releaseHeavyAttack();
-      }
+      if (e.key === 'Shift' && this.isDesktopGameplayInput() && performance.now() - this.shiftPressedAt < 185) this.triggerDodge();
     });
 
     window.addEventListener('mousedown', (e) => {
+      if (!this.isDesktopGameplayInput()) return;
       if (e.button === 0) this.triggerLightAttack();
       if (e.button === 2) this.startChargingHeavy();
     });
 
     window.addEventListener('mouseup', (e) => {
-      if (e.button === 2 && this.isChargingHeavy) {
+      if (e.button === 2 && this.isDesktopGameplayInput() && this.isChargingHeavy) {
         this.releaseHeavyAttack();
       }
     });
@@ -425,6 +432,11 @@ export class Player3D {
       if (action === 'wave') this.triggerWaveAbility();
       if (action === 'ultimate') this.triggerUltimate();
     });
+  }
+
+  private isDesktopGameplayInput() {
+    const canvas = this.scene.getEngine().getRenderingCanvas();
+    return document.pointerLockElement === canvas;
   }
 
   public update(delta: number) {
@@ -444,7 +456,7 @@ export class Player3D {
     // Sheath timer: return blade to scabbard if idle
     if (this.weapon.isDrawn && !this.isAttacking && !this.isChargingHeavy) {
       this.sheathTimer += delta;
-      if (this.sheathTimer > 1500) {
+      if (this.sheathTimer > 2000) {
         this.weapon.sheathWeapon();
       }
     }
@@ -476,6 +488,7 @@ export class Player3D {
       maxUltimate: this.maxUltimate,
       shield: 0
     });
+    GameBridge.emit('ability_cooldown', { current: this.abilityCooldown, max: this.maxAbilityCooldown });
   }
 
   private handleGravity(dt: number) {
@@ -538,6 +551,8 @@ export class Player3D {
     }
 
     const inputMag = Math.sqrt(inputX * inputX + inputZ * inputZ);
+    this.isSprinting = this.inputKeys['shift'] === true && inputMag > 0.05 && !this.isAttacking && !this.isDodging && this.stamina > 0;
+    this.camera.setSprinting(this.isSprinting);
 
     if (inputMag > 0.05 && (!this.isAttacking || !this.isGrounded)) {
       // Normalize and project relative to Camera Forward
@@ -559,6 +574,10 @@ export class Player3D {
 
       // Speed calculation
       let currentSpeed = this.baseSpeed;
+      if (this.isSprinting) {
+        currentSpeed *= 1.48;
+        this.stamina = Math.max(0, this.stamina - 16 * dt);
+      }
       if (this.isDodging) currentSpeed *= 1.8;
       if (this.isAttacking) currentSpeed *= 0.3;
 
@@ -569,6 +588,8 @@ export class Player3D {
         this.animState = 'run';
       }
     } else {
+      this.isSprinting = false;
+      this.camera.setSprinting(false);
       if (this.isGrounded && !this.isAttacking && !this.isDodging && this.animState !== 'land') {
         this.animState = 'idle';
       }
@@ -816,39 +837,41 @@ export class Player3D {
     this.rootMesh.moveWithCollisions(forward.scale(1.8));
   }
 
-  public triggerJumpOrDodge() {
+  public triggerJump() {
     if (this.isDead) return;
-
     if (this.isGrounded && this.animState !== 'jump_start' && this.animState !== 'airborne') {
-      if (this.stamina >= 20) {
-        this.stamina -= 20;
-        this.animState = 'jump_start';
-        this.stateTimer = 110;
-        this.soundManager.playDodge();
-
-        setTimeout(() => {
-          if (this.animState === 'jump_start') {
-            this.isGrounded = false;
-            this.verticalVelocity = this.jumpPower;
-            this.animState = 'airborne';
-          }
-        }, 100);
-      }
-    } else if (!this.isDodging && this.stamina >= 25) {
-      // Air dodge / dash
-      this.stamina -= 25;
-      this.isDodging = true;
-      this.isInvulnerable = true;
-      this.animState = 'dodge';
-      this.stateTimer = 280;
-      this.soundManager.playDodge();
+      this.animState = 'jump_start';
+      this.stateTimer = 110;
+      window.setTimeout(() => {
+        if (this.animState === 'jump_start') {
+          this.isGrounded = false;
+          this.verticalVelocity = this.jumpPower;
+          this.animState = 'airborne';
+        }
+      }, 100);
     }
   }
+
+  public triggerDodge() {
+    if (this.isDead || this.isDodging || this.stamina < 25) return;
+    this.stamina -= 25;
+    this.isDodging = true;
+    this.isInvulnerable = true;
+    this.animState = 'dodge';
+    this.stateTimer = 280;
+    this.soundManager.playDodge();
+    const forward = this.rootMesh.forward.clone().normalize();
+    this.rootMesh.moveWithCollisions(forward.scale(2.25));
+  }
+
+  // Kept for touch controls, where the single evasive button maps to dodge.
+  public triggerJumpOrDodge() { this.triggerDodge(); }
 
   public triggerWaveAbility() {
     if (this.isDead || this.abilityCooldown > 0) return;
     this.abilityCooldown = this.maxAbilityCooldown;
     this.triggerHeavyAttackInstant();
+    this.onWaveActivate?.();
     this.soundManager.playAbilityWave();
     GameBridge.emit('toast_message', {
       title: '✦ TRANSMUTATION WAVE RELEASED',
@@ -861,6 +884,7 @@ export class Player3D {
     if (this.isDead || this.ultimate < this.maxUltimate) return;
     this.ultimate = 0;
     this.triggerHeavyAttackInstant();
+    this.onUltimateActivate?.();
     this.camera.shake(0.5, 450);
     this.soundManager.playHeavyRelease();
     GameBridge.emit('toast_message', {

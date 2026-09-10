@@ -142,7 +142,7 @@ export const VirtualControls: React.FC = () => {
           <span className="text-[9px] font-tech font-bold">DODGE</span>
         </button>
 
-        {/* Heavy Attack [K] */}
+        {/* Heavy Attack */}
         <button
           onTouchStart={() => triggerButton('heavyAttack', true)}
           onTouchEnd={() => triggerButton('heavyAttack', false)}
@@ -152,7 +152,7 @@ export const VirtualControls: React.FC = () => {
           <span className="text-[9px] font-tech font-bold">HEAVY</span>
         </button>
 
-        {/* Light Attack [J] */}
+        {/* Light Attack */}
         <button
           onTouchStart={() => triggerButton('lightAttack', true)}
           onTouchEnd={() => triggerButton('lightAttack', false)}

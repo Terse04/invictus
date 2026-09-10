@@ -18,7 +18,7 @@ export class ParticleVFX3D {
   }
 
   // 3D Hit Sparks
-  public emitHitSparks(pos: Vector3, color: Color4 = new Color4(0, 0.95, 1.0, 1.0), count: number = 24) {
+  public emitHitSparks(pos: Vector3, color: Color4 = new Color4(1.0, 0.68, 0.22, 1.0), count: number = 24) {
     for (let i = 0; i < count; i++) {
       const spark = MeshBuilder.CreateSphere('spark', { diameter: 0.08 }, this.scene);
       spark.position = pos.clone();
@@ -52,7 +52,7 @@ export class ParticleVFX3D {
   }
 
   // 3D Expanding Shockwave Ring
-  public emitShockwave(pos: Vector3, maxRadius: number = 4.5, color: Color3 = new Color3(0, 0.95, 1.0)) {
+  public emitShockwave(pos: Vector3, maxRadius: number = 4.5, color: Color3 = new Color3(0.42, 0.76, 0.35)) {
     const ring = MeshBuilder.CreateTorus('shockwaveRing', {
       diameter: 0.5,
       thickness: 0.12,
@@ -97,7 +97,7 @@ export class ParticleVFX3D {
     wave.rotation = new Vector3(Math.PI / 2, angle, 0);
 
     const mat = new StandardMaterial('waveMat', this.scene);
-    mat.emissiveColor = new Color3(0.0, 0.95, 1.0);
+    mat.emissiveColor = new Color3(0.48, 0.74, 0.30);
     mat.alpha = 0.85;
     wave.material = mat;
 

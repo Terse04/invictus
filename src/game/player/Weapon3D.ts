@@ -41,7 +41,7 @@ export class Weapon3D {
     const sayaMat = new StandardMaterial('sayaMat', scene);
     sayaMat.diffuseColor = new Color3(0.04, 0.06, 0.10); // Lacquered obsidian
     sayaMat.specularColor = new Color3(0.5, 0.7, 0.9);
-    sayaMat.emissiveColor = new Color3(0.0, 0.15, 0.25); // Subtle cyan circuit trim
+    sayaMat.emissiveColor = new Color3(0.03, 0.11, 0.06); // Subtle jade lacquer inlay
     this.sayaMesh.material = sayaMat;
 
     // Gold Sageo band on scabbard
@@ -72,7 +72,7 @@ export class Weapon3D {
     const bladeMat = new StandardMaterial('katanaBladeMat', scene);
     bladeMat.diffuseColor = new Color3(0.9, 0.95, 1.0);
     bladeMat.specularColor = new Color3(1, 1, 1);
-    bladeMat.emissiveColor = new Color3(0.0, 0.85, 1.0); // Cyan quantum plasma edge
+    bladeMat.emissiveColor = new Color3(0.18, 0.42, 0.20); // Ancient jade edge, not neon plasma
     bladeMat.specularPower = 128;
     this.bladeMesh.material = bladeMat;
 
@@ -84,7 +84,7 @@ export class Weapon3D {
     }, scene);
     fuller.parent = this.bladeMesh;
     const fullerMat = new StandardMaterial('fullerMat', scene);
-    fullerMat.emissiveColor = new Color3(0.3, 0.95, 1.0);
+    fullerMat.emissiveColor = new Color3(0.62, 0.52, 0.18);
     fuller.material = fullerMat;
 
     // 4. Tsuba (Crossguard) - Ancient geometric octagonal plate
@@ -154,8 +154,8 @@ export class Weapon3D {
     if (!this.trailMesh) {
       this.trailMesh = new TrailMesh('weaponTrail', this.bladeMesh, this.scene, 0.45, 24, true);
       const trailMat = new StandardMaterial('trailMat', this.scene);
-      trailMat.emissiveColor = new Color3(0.0, 0.95, 1.0);
-      trailMat.alpha = 0.75;
+      trailMat.emissiveColor = new Color3(0.76, 0.62, 0.22);
+      trailMat.alpha = 0.62;
       this.trailMesh.material = trailMat;
     }
   }

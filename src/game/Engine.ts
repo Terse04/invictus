@@ -8,6 +8,7 @@ import {
   HemisphericLight,
   ShadowGenerator
 } from '@babylonjs/core';
+import '@babylonjs/loaders';
 
 export class GameEngine {
   public engine: Engine;
@@ -47,32 +48,32 @@ export class GameEngine {
     });
 
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.03, 0.05, 0.09, 1.0); // Deep celestial midnight indigo
+    this.scene.clearColor = new Color4(0.16, 0.22, 0.27, 1.0);
 
     // Atmospheric 3D Exponential Fog for cinematic spatial depth
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.0072;
-    this.scene.fogColor = new Color3(0.03, 0.05, 0.09);
+    this.scene.fogDensity = 0.004;
+    this.scene.fogColor = new Color3(0.16, 0.22, 0.27);
 
     // Collisions setup
     this.scene.collisionsEnabled = true;
 
     // Ambient Celestial Hemispheric Light (Cool midnight blue ambient)
     this.hemiLight = new HemisphericLight('hemiLight', new Vector3(0, 1, 0), this.scene);
-    this.hemiLight.intensity = 0.55;
-    this.hemiLight.diffuse = new Color3(0.45, 0.65, 0.92);
-    this.hemiLight.groundColor = new Color3(0.08, 0.12, 0.18);
+    this.hemiLight.intensity = 0.7;
+    this.hemiLight.diffuse = new Color3(0.72, 0.82, 0.68);
+    this.hemiLight.groundColor = new Color3(0.10, 0.14, 0.10);
 
     // Key Directional Moonlight (Crisp silvery light casting sharp shadows)
     this.dirLight = new DirectionalLight('dirLight', new Vector3(-0.5, -1.4, 0.8), this.scene);
     this.dirLight.position = new Vector3(35, 75, -35);
-    this.dirLight.intensity = 1.9;
-    this.dirLight.diffuse = new Color3(0.92, 0.96, 1.0);
+    this.dirLight.intensity = 1.45;
+    this.dirLight.diffuse = new Color3(1.0, 0.84, 0.62);
 
     // Dynamic Rim Light (Illuminates silhouette edges from behind)
     const rimLight = new DirectionalLight('rimLight', new Vector3(0.5, 0.6, -1.0), this.scene);
-    rimLight.intensity = 0.85;
-    rimLight.diffuse = new Color3(0.15, 0.75, 1.0);
+    rimLight.intensity = 0.4;
+    rimLight.diffuse = new Color3(0.36, 0.68, 0.45);
 
     // Dynamic Shadow Generator
     this.shadowGenerator = new ShadowGenerator(2048, this.dirLight);

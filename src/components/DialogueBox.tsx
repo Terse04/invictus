@@ -9,6 +9,7 @@ export const DialogueBox: React.FC = () => {
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const soundManager = useRef(SoundManager.getInstance());
+  const handleNextRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     const unsub = GameBridge.on('dialogue_open', (payload: DialoguePayload) => {
@@ -43,9 +44,8 @@ export const DialogueBox: React.FC = () => {
     return () => clearInterval(timer);
   }, [dialogue, currentLineIndex]);
 
-  if (!dialogue) return null;
-
   const handleNext = () => {
+    if (!dialogue) return;
     if (isTyping) {
       // Instant reveal
       setDisplayedText(dialogue.lines[currentLineIndex]);
@@ -62,6 +62,20 @@ export const DialogueBox: React.FC = () => {
       GameBridge.emit('dialogue_close');
     }
   };
+
+  handleNextRef.current = handleNext;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.repeat) return;
+      event.preventDefault();
+      handleNextRef.current();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  if (!dialogue) return null;
 
   return (
     <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-end justify-center p-6 select-none">
@@ -96,7 +110,7 @@ export const DialogueBox: React.FC = () => {
 
           <div className="flex justify-end items-center text-xs font-tech text-cyan-400/80 pt-2 space-x-1">
             <span>{currentLineIndex + 1} / {dialogue.lines.length}</span>
-            <span>· Tap / Click to Continue</span>
+            <span>· Enter / Tap / Click to Continue</span>
             <ChevronRight className="w-4 h-4 animate-pulse" />
           </div>
         </div>

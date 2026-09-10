@@ -47,10 +47,10 @@ export const PauseModal: React.FC<PauseModalProps> = ({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h2 className="text-xl font-cinzel font-black text-cyan-300 tracking-wider">
-              INVICTUS // SYSTEM PAUSE
+              INVICTUS — PAUSED
             </h2>
             <p className="text-xs font-tech text-slate-400">
-              Celestial Transmutation Vertical Slice
+              Celestial Sanctuary
             </p>
           </div>
           <button
@@ -65,8 +65,8 @@ export const PauseModal: React.FC<PauseModalProps> = ({
         {/* Audio & Video Settings */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-sm font-cinzel text-slate-200">
-            <Volume2 className="w-4 h-4 text-cyan-400" />
-            <span>SYNTHESIZER AUDIO CHANNELS</span>
+            <Volume2 className="w-4 h-4 text-emerald-400" />
+            <span>AUDIO</span>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -151,14 +151,14 @@ export const PauseModal: React.FC<PauseModalProps> = ({
         <div className="border border-slate-800 rounded p-3 bg-slate-950/60 space-y-2">
           <div className="text-xs font-cinzel text-slate-300 font-bold">CONTROLS REFERENCE</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-tech text-slate-400">
-            <div><span className="text-cyan-400 font-bold">WASD / Stick:</span> Move & Aim</div>
-            <div><span className="text-cyan-400 font-bold">J / Left Click:</span> 3-Hit Light Combo</div>
-            <div><span className="text-cyan-400 font-bold">Space / Shift:</span> Dodge Dash (iframes)</div>
-            <div><span className="text-cyan-400 font-bold">K / Right Click:</span> Charged Heavy Break</div>
-            <div><span className="text-cyan-400 font-bold">E:</span> Transmutation Wave</div>
-            <div><span className="text-cyan-400 font-bold">Q:</span> Celestial Resonance (Ult)</div>
-            <div><span className="text-cyan-400 font-bold">F:</span> Interact with NPC / Monuments</div>
-            <div><span className="text-cyan-400 font-bold">ESC:</span> Pause Menu</div>
+            <div><span className="text-emerald-400 font-bold">WASD / Stick:</span> Move camera-relative</div>
+            <div><span className="text-emerald-400 font-bold">LMB:</span> 3-Hit Light Combo</div>
+            <div><span className="text-emerald-400 font-bold">Shift:</span> Hold to sprint, tap to evade</div>
+            <div><span className="text-emerald-400 font-bold">RMB:</span> Charged Heavy Strike</div>
+            <div><span className="text-emerald-400 font-bold">Space:</span> Jump</div>
+            <div><span className="text-emerald-400 font-bold">E / Q:</span> Wave / Celestial Burst</div>
+            <div><span className="text-emerald-400 font-bold">F:</span> Interact</div>
+            <div><span className="text-emerald-400 font-bold">ESC:</span> Release cursor / Pause</div>
           </div>
         </div>
 

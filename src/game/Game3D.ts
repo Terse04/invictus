@@ -31,6 +31,7 @@ export class Game3D {
   public sanctumBarrier: ArenaGate3D;
 
   private isDisposed = false;
+  private isPaused = false;
 
   constructor(canvas: HTMLCanvasElement) {
     // 1. Initialize Babylon.js 3D Engine & Scene
@@ -66,12 +67,20 @@ export class Game3D {
       const forward = this.player.rootMesh.forward.clone().normalize();
       this.combatManager.resolvePlayerMeleeAttack({
         origin: this.player.rootMesh.position.add(new Vector3(0, 0.9, 0)),
+        bladeRoot: this.player.weapon.rootNode.getAbsolutePosition(),
+        bladeTip: this.player.weapon.getWorldTipPosition(),
         direction: forward,
         range: isHeavy ? 3.8 : 2.8,
         damage,
         poiseDamage: isHeavy ? 45 : 20,
         isHeavy
       });
+    };
+    this.player.onWaveActivate = () => {
+      this.combatManager.spawnTransmutationWave(this.player.rootMesh.position.add(new Vector3(0, 0.85, 0)), this.player.rootMesh.forward.clone().normalize());
+    };
+    this.player.onUltimateActivate = () => {
+      this.combatManager.triggerCelestialResonance(this.player.rootMesh.position.clone());
     };
 
     // 6. 3D Elder Yan NPC in Zone 2
@@ -92,6 +101,8 @@ export class Game3D {
       const now = performance.now();
       const delta = Math.min(now - lastTime, 100);
       lastTime = now;
+
+      if (this.isPaused || this.combatManager.isHitPaused()) return;
 
       // Update Player & Camera
       this.player.update(delta);
@@ -181,8 +192,13 @@ export class Game3D {
     });
   }
 
+  public setPaused(value: boolean) {
+    this.isPaused = value;
+  }
+
   public dispose() {
     this.isDisposed = true;
+    this.camera.dispose();
     this.engine.dispose();
   }
 }

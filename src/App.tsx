@@ -40,10 +40,15 @@ export const App: React.FC = () => {
     // Global Key Listener for ESC pause
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+        if (document.pointerLockElement === canvasRef.current) document.exitPointerLock();
         setIsPaused(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+    const handlePointerLockChange = () => {
+      if (document.pointerLockElement !== canvasRef.current && gameRef.current) setIsPaused(true);
+    };
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
 
     // Victory listener
     const unsubVictory = GameBridge.on('victory', (payload: VictoryPayload) => {
@@ -65,6 +70,7 @@ export const App: React.FC = () => {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
       unsubVictory();
       unsubDeath();
       if (gameRef.current) {
@@ -74,12 +80,17 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    gameRef.current?.setPaused(isPaused);
+  }, [isPaused]);
+
   const handlePause = () => {
     setIsPaused(true);
   };
 
   const handleResume = () => {
     setIsPaused(false);
+    canvasRef.current?.requestPointerLock();
   };
 
   const handleRestart = () => {
@@ -156,4 +167,3 @@ export const App: React.FC = () => {
     </ErrorBoundary>
   );
 };
-
