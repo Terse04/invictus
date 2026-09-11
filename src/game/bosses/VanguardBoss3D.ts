@@ -102,6 +102,17 @@ export class VanguardBoss3D extends EnemyBase3D {
     const halberdMat = new StandardMaterial('vanguardHalberdMat', scene);
     halberdMat.emissiveColor = this.isVulcan ? Color3.FromHexString('#ff4400') : new Color3(1.0, 0.85, 0.2);
     this.halberdMesh.material = halberdMat;
+
+    // Heavy Crescent Halberd Blade (Guan Dao style)
+    const halberdBlade = MeshBuilder.CreateBox('vanguardHalberdBlade', {
+      width: 0.08,
+      height: 1.4,
+      depth: 0.45
+    }, scene);
+    halberdBlade.parent = this.halberdMesh;
+    halberdBlade.position.y = 1.9;
+    halberdBlade.position.z = 0.2;
+    halberdBlade.material = halberdMat;
   }
 
   public override update(delta: number) {

@@ -432,6 +432,182 @@ export class SoundManager {
     osc.stop(now + 1.5);
   }
 
+  public playKatanaDraw() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    // High metallic friction draw sound
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1450, now);
+    osc.frequency.exponentialRampToValueAtTime(3200, now + 0.22);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(2400, now);
+    filter.Q.setValueAtTime(8, now);
+
+    gain.gain.setValueAtTime(0.32, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.28);
+  }
+
+  public playSheathClick() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    // Crisp mechanical latch/click
+    const click = this.ctx.createOscillator();
+    const clickGain = this.ctx.createGain();
+    click.type = 'triangle';
+    click.frequency.setValueAtTime(1850, now);
+    click.frequency.exponentialRampToValueAtTime(240, now + 0.045);
+
+    clickGain.gain.setValueAtTime(0.48, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    click.connect(clickGain);
+    clickGain.connect(this.sfxGain);
+    click.start(now);
+    click.stop(now + 0.05);
+
+    // Subtle metallic resonance tail
+    const ring = this.ctx.createOscillator();
+    const ringGain = this.ctx.createGain();
+    ring.type = 'sine';
+    ring.frequency.setValueAtTime(880, now + 0.01);
+    ringGain.gain.setValueAtTime(0.16, now + 0.01);
+    ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    ring.connect(ringGain);
+    ringGain.connect(this.sfxGain);
+    ring.start(now + 0.01);
+    ring.stop(now + 0.35);
+  }
+
+  public playBladeFlick() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(1480, now + 0.12);
+
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  }
+
+  public playCelestialDescent() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    // Deep cosmic quantum drone descending
+    const drone = this.ctx.createOscillator();
+    const droneGain = this.ctx.createGain();
+    drone.type = 'sawtooth';
+    drone.frequency.setValueAtTime(65, now);
+    drone.frequency.linearRampToValueAtTime(180, now + 2.5);
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(120, now);
+    filter.frequency.exponentialRampToValueAtTime(950, now + 2.5);
+
+    droneGain.gain.setValueAtTime(0.02, now);
+    droneGain.gain.linearRampToValueAtTime(0.35, now + 2.2);
+    droneGain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
+
+    drone.connect(filter);
+    filter.connect(droneGain);
+    droneGain.connect(this.sfxGain);
+
+    drone.start(now);
+    drone.stop(now + 2.8);
+  }
+
+  public playLightningStrike() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    // Explosive sub-bass impact
+    const sub = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(220, now);
+    sub.frequency.exponentialRampToValueAtTime(30, now + 0.45);
+    subGain.gain.setValueAtTime(0.7, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    sub.connect(subGain);
+    subGain.connect(this.sfxGain);
+    sub.start(now);
+    sub.stop(now + 0.45);
+
+    // Crack noise
+    const noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.2, this.ctx.sampleRate);
+    const d = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const nFilter = this.ctx.createBiquadFilter();
+    nFilter.type = 'bandpass';
+    nFilter.frequency.setValueAtTime(3400, now);
+    nFilter.Q.setValueAtTime(3, now);
+
+    const nGain = this.ctx.createGain();
+    nGain.gain.setValueAtTime(0.55, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    noise.connect(nFilter);
+    nFilter.connect(nGain);
+    nGain.connect(this.sfxGain);
+    noise.start(now);
+    noise.stop(now + 0.2);
+  }
+
+  public playChapterFanfare() {
+    this.initCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    // Harmonic triad
+    [220, 277.18, 329.63, 440].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
+
+      gain.gain.setValueAtTime(0.18, now + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 1.2);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 1.2);
+    });
+  }
+
   public playUIClick() {
     this.initCtx();
     if (!this.ctx || !this.sfxGain) return;

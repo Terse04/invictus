@@ -8,6 +8,8 @@ import { QualityProfile } from '../QualitySettings';
 export class Environment3D {
   public groundMeshes: Mesh[] = [];
   public floatingElements: Mesh[] = [];
+  public summonBeamMesh: Mesh | null = null;
+  public awakeningSealMesh: Mesh | null = null;
   private readonly scene: Scene;
   private readonly shadows: ShadowGenerator;
   private readonly quality: QualityProfile;
@@ -61,6 +63,7 @@ export class Environment3D {
     }
 
     this.createTerrace(new Vector3(0, 0.18, 0), 25, 0.5, stone);
+    this.createAwakeningSeal(stone, darkStone, jade);
     this.createTorii(new Vector3(0, 0.3, 16), darkStone, jade);
     this.createTerrace(new Vector3(0, 0.18, 42), 19, 0.42, stone);
     this.createTorii(new Vector3(0, 0.3, 64), darkStone, jade);
@@ -185,27 +188,147 @@ export class Environment3D {
     }
   }
 
+  private createAwakeningSeal(stone: StandardMaterial, darkStone: StandardMaterial, jade: StandardMaterial) {
+    const sealRoot = new Mesh('awakeningSealRoot', this.scene);
+    sealRoot.position = new Vector3(0, 0.19, -5);
+    this.awakeningSealMesh = sealRoot;
+
+    // 1. Concentric Runic Dais
+    const dais = MeshBuilder.CreateCylinder('awakeningDais', { height: 0.18, diameter: 7.2, tessellation: 36 }, this.scene);
+    dais.parent = sealRoot;
+    dais.material = darkStone;
+    dais.receiveShadows = true;
+    dais.checkCollisions = true;
+    this.groundMeshes.push(dais);
+
+    // Inner and Outer Jade Conduit Rings
+    const outerRing = MeshBuilder.CreateTorus('sealOuterRing', { diameter: 6.2, thickness: 0.08, tessellation: 36 }, this.scene);
+    outerRing.parent = sealRoot;
+    outerRing.position.y = 0.1;
+    outerRing.material = jade;
+
+    const innerRing = MeshBuilder.CreateTorus('sealInnerRing', { diameter: 3.4, thickness: 0.06, tessellation: 28 }, this.scene);
+    innerRing.parent = sealRoot;
+    innerRing.position.y = 0.1;
+    innerRing.material = jade;
+
+    // 6 Perimeter Jade Circuit Relic Nodes
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const nodeX = Math.cos(angle) * 3.1;
+      const nodeZ = Math.sin(angle) * 3.1;
+
+      const pylon = MeshBuilder.CreateCylinder(`sealPylon_${i}`, { height: 0.75, diameter: 0.42, tessellation: 8 }, this.scene);
+      pylon.parent = sealRoot;
+      pylon.position = new Vector3(nodeX, 0.4, nodeZ);
+      pylon.material = stone;
+      this.shadows.addShadowCaster(pylon);
+
+      const orb = MeshBuilder.CreateSphere(`sealOrb_${i}`, { diameter: 0.22 }, this.scene);
+      orb.parent = pylon;
+      orb.position.y = 0.45;
+      orb.material = jade;
+    }
+
+    // 2. Vertical Celestial Quantum Summoning Beam
+    const beamMat = new StandardMaterial('summonBeamMat', this.scene);
+    beamMat.diffuseColor = new Color3(0.0, 0.8, 0.6);
+    beamMat.emissiveColor = Color3.FromHexString('#00f0ff');
+    beamMat.alpha = 0;
+    beamMat.backFaceCulling = false;
+
+    this.summonBeamMesh = MeshBuilder.CreateCylinder('celestialSummonBeam', {
+      height: 38,
+      diameterTop: 2.8,
+      diameterBottom: 2.2,
+      tessellation: 24
+    }, this.scene);
+    this.summonBeamMesh.position = new Vector3(0, 19, -5);
+    this.summonBeamMesh.material = beamMat;
+    this.summonBeamMesh.isVisible = false;
+  }
+
+  public triggerSummonBeam(duration = 2600) {
+    if (!this.summonBeamMesh) return;
+    this.summonBeamMesh.isVisible = true;
+    const mat = this.summonBeamMesh.material as StandardMaterial;
+    if (!mat) return;
+
+    const start = performance.now();
+    const timer = window.setInterval(() => {
+      const elapsed = performance.now() - start;
+      const t = elapsed / duration;
+
+      if (t < 0.25) {
+        // Rapid flash in
+        mat.alpha = (t / 0.25) * 0.82;
+      } else if (t < 0.7) {
+        // Holding celestial column
+        mat.alpha = 0.82;
+      } else if (t < 1.0) {
+        // Dissipating into celestial atmosphere
+        mat.alpha = 0.82 * (1 - (t - 0.7) / 0.3);
+      } else {
+        mat.alpha = 0;
+        this.summonBeamMesh!.isVisible = false;
+        window.clearInterval(timer);
+      }
+    }, 16);
+  }
+
   private createTorii(pos: Vector3, stone: StandardMaterial, rune: StandardMaterial) {
     const root = new Mesh(`weatheredTorii_${pos.z}`, this.scene);
     root.position = pos;
+
+    const goldMat = this.material('toriiGold', new Color3(0.3, 0.22, 0.08), new Color3(0.85, 0.65, 0.15));
+
     [-1, 1].forEach((side) => {
-      const post = MeshBuilder.CreateCylinder(`toriiPost_${pos.z}_${side}`, { height: 5.6, diameter: 0.7, tessellation: 10 }, this.scene);
+      const post = MeshBuilder.CreateCylinder(`toriiPost_${pos.z}_${side}`, { height: 6.2, diameter: 0.76, tessellation: 12 }, this.scene);
       post.parent = root;
-      post.position = new Vector3(side * 3.45, 2.8, 0);
+      post.position = new Vector3(side * 3.65, 3.1, 0);
       post.material = stone;
       post.checkCollisions = true;
       this.shadows.addShadowCaster(post);
+
+      // Stone base plinths
+      const plinth = MeshBuilder.CreateBox(`toriiPlinth_${pos.z}_${side}`, { width: 1.1, height: 0.45, depth: 1.1 }, this.scene);
+      plinth.parent = root;
+      plinth.position = new Vector3(side * 3.65, 0.22, 0);
+      plinth.material = stone;
+
+      // Hanging Bronze Celestial Lanterns
+      const lantern = MeshBuilder.CreateCylinder(`toriiLantern_${pos.z}_${side}`, { height: 0.75, diameterTop: 0.35, diameterBottom: 0.25, tessellation: 6 }, this.scene);
+      lantern.parent = root;
+      lantern.position = new Vector3(side * 2.8, 4.4, 0);
+      lantern.material = goldMat;
+
+      const lanternCore = MeshBuilder.CreateSphere(`lanternCore_${pos.z}_${side}`, { diameter: 0.22 }, this.scene);
+      lanternCore.parent = lantern;
+      lanternCore.position.y = 0;
+      lanternCore.material = rune;
     });
-    const lintel = MeshBuilder.CreateBox(`toriiLintel_${pos.z}`, { width: 9.1, height: 0.5, depth: 0.8 }, this.scene);
+
+    // Main Lintel beam
+    const lintel = MeshBuilder.CreateBox(`toriiLintel_${pos.z}`, { width: 10.4, height: 0.55, depth: 0.85 }, this.scene);
     lintel.parent = root;
-    lintel.position.y = 5.45;
-    lintel.rotation.z = 0.035;
+    lintel.position.y = 5.95;
     lintel.material = stone;
-    const runeBand = MeshBuilder.CreateBox(`toriiRune_${pos.z}`, { width: 5.2, height: 0.08, depth: 0.84 }, this.scene);
-    runeBand.parent = root;
-    runeBand.position = new Vector3(0, 4.8, 0.02);
-    runeBand.material = rune;
     this.shadows.addShadowCaster(lintel);
+
+    // Sweeping Winged Eaves (Chinese Temple Roof Cornice)
+    [-1, 1].forEach((side) => {
+      const eaveWing = MeshBuilder.CreateBox(`toriiEaveWing_${pos.z}_${side}`, { width: 1.6, height: 0.35, depth: 0.9 }, this.scene);
+      eaveWing.parent = root;
+      eaveWing.position = new Vector3(side * 5.2, 6.35, 0);
+      eaveWing.rotation.z = side * -0.28;
+      eaveWing.material = stone;
+    });
+
+    // Glowing Jade Inscribed Rune Bar
+    const runeBand = MeshBuilder.CreateBox(`toriiRune_${pos.z}`, { width: 6.2, height: 0.1, depth: 0.88 }, this.scene);
+    runeBand.parent = root;
+    runeBand.position = new Vector3(0, 5.25, 0.02);
+    runeBand.material = rune;
   }
 
   private createColonnade(stone: StandardMaterial, rune: StandardMaterial) {

@@ -96,17 +96,26 @@ export class ShenlongBoss3D {
     collar.parent = dragonVisual; collar.position = new Vector3(0, 0, -1.02); collar.rotation.x = Math.PI / 2; collar.material = this.hornMat;
 
     // Branching Celestial Horns
-    const leftHorn = MeshBuilder.CreateCylinder('lHorn', { height: 2.2, diameterTop: 0.08, diameterBottom: 0.32 }, scene);
+    const leftHorn = MeshBuilder.CreateCylinder('lHorn', { height: 2.4, diameterTop: 0.08, diameterBottom: 0.32 }, scene);
     leftHorn.parent = this.rootMesh;
-    leftHorn.position = new Vector3(-0.9, 1.2, -0.6);
-    leftHorn.rotation = new Vector3(-0.6, 0, -0.4);
+    leftHorn.position = new Vector3(-0.95, 1.3, -0.6);
+    leftHorn.rotation = new Vector3(-0.6, 0, -0.42);
     leftHorn.material = this.hornMat;
 
-    const rightHorn = MeshBuilder.CreateCylinder('rHorn', { height: 2.2, diameterTop: 0.08, diameterBottom: 0.32 }, scene);
+    const rightHorn = MeshBuilder.CreateCylinder('rHorn', { height: 2.4, diameterTop: 0.08, diameterBottom: 0.32 }, scene);
     rightHorn.parent = this.rootMesh;
-    rightHorn.position = new Vector3(0.9, 1.2, -0.6);
-    rightHorn.rotation = new Vector3(-0.6, 0, 0.4);
+    rightHorn.position = new Vector3(0.95, 1.3, -0.6);
+    rightHorn.rotation = new Vector3(-0.6, 0, 0.42);
     rightHorn.material = this.hornMat;
+
+    // Cybernetic Whiskers / Qi Sensor Antennae
+    [-1, 1].forEach((side) => {
+      const whisker = MeshBuilder.CreateCylinder(`shenlongWhisker_${side}`, { height: 2.6, diameterTop: 0.02, diameterBottom: 0.06, tessellation: 8 }, scene);
+      whisker.parent = this.rootMesh;
+      whisker.position = new Vector3(side * 0.72, -0.15, 2.2);
+      whisker.rotation = new Vector3(0.35, side * 0.28, side * 0.15);
+      whisker.material = this.headMat;
+    });
 
     // Glowing Cyber-Optics
     const leftEye = MeshBuilder.CreateSphere('lEye', { diameter: 0.45 }, scene);
@@ -121,15 +130,34 @@ export class ShenlongBoss3D {
     rightEye.position = new Vector3(0.85, 0.4, 1.1);
     rightEye.material = eyeMat;
 
-    // Segmented armored body: a deliberate spine architecture rather than a string of spheres.
+    // Segmented armored body with dorsal spine blades and articulated cyber-talons
     for (let i = 0; i < this.segmentCount; i++) {
-      const seg = MeshBuilder.CreateCapsule(`dragonSeg_${i}`, { radius: 0.9 - i * 0.045, height: 2.25 - i * 0.09, tessellation: 10 }, scene);
+      const seg = MeshBuilder.CreateCapsule(`dragonSeg_${i}`, { radius: 0.92 - i * 0.045, height: 2.3 - i * 0.09, tessellation: 10 }, scene);
       seg.position = spawnPos.clone();
       seg.rotation.x = Math.PI / 2;
       seg.material = this.bodyMat;
       this.bodySegments.push(seg);
-      const armorBand = MeshBuilder.CreateTorus(`dragonArmorBand_${i}`, { diameter: 1.72 - i * 0.09, thickness: 0.12, tessellation: 12 }, scene);
+
+      const armorBand = MeshBuilder.CreateTorus(`dragonArmorBand_${i}`, { diameter: 1.76 - i * 0.09, thickness: 0.13, tessellation: 12 }, scene);
       armorBand.parent = seg; armorBand.rotation.x = Math.PI / 2; armorBand.material = this.hornMat;
+
+      // Dorsal Mechanical Spine Blade Fin
+      const dorsalFin = MeshBuilder.CreateBox(`dragonSpineFin_${i}`, { width: 0.12, height: 0.75 - i * 0.035, depth: 0.85 }, scene);
+      dorsalFin.parent = seg;
+      dorsalFin.position = new Vector3(0, 0, 0.85 - i * 0.03);
+      dorsalFin.rotation.x = -0.3;
+      dorsalFin.material = this.hornMat;
+
+      // Foreward Cyber-Talons (Segments 1 and 3)
+      if (i === 1 || i === 3) {
+        [-1, 1].forEach((side) => {
+          const claw = MeshBuilder.CreateCylinder(`dragonClaw_${i}_${side}`, { height: 1.1, diameterTop: 0.06, diameterBottom: 0.22, tessellation: 8 }, scene);
+          claw.parent = seg;
+          claw.position = new Vector3(side * 1.1, 0, -0.6);
+          claw.rotation = new Vector3(0.4, 0, side * 0.65);
+          claw.material = this.hornMat;
+        });
+      }
     }
 
     // Pre-fill history buffer
@@ -497,6 +525,9 @@ export class ShenlongBoss3D {
   public die() {
     this.isDead = true;
 
+    // 1. Brief hit-stop freeze frame on fatal blow
+    (this.scene as any).combatManager?.triggerHitPause?.(320);
+
     GameBridge.emit('boss_encounter', {
       active: false,
       name: '',
@@ -510,25 +541,40 @@ export class ShenlongBoss3D {
     this.soundManager.playBossRoar();
     this.soundManager.playVictoryFanfare();
 
-    // Explode segments sequentially
+    // 2. Explode body segments sequentially with harmonic golden/cyan shockwaves
     this.bodySegments.forEach((seg, i) => {
       window.setTimeout(() => {
-        this.particles.emitShockwave(seg.position, 4.5, new Color3(1.0, 0.85, 0.2));
+        this.particles.emitShockwave(seg.position, 4.8, new Color3(0.0, 0.95, 0.8));
         seg.dispose();
-      }, i * 140);
+      }, i * 130);
+    });
+
+    // 3. Initiate Dramatic 360-degree Orbital Camera Sweep around Lin Yun
+    this.targetPlayer.camera.playOrbitalSweep(this.targetPlayer.rootMesh.position, 4800);
+
+    // 4. Lin Yun executes graceful blade flick and deliberate katana sheathing flourish
+    this.targetPlayer.playVictorySequence();
+
+    // 5. Holographic Victory Banner
+    GameBridge.emit('toast_message', {
+      title: '✦ SANCTUM LIBERATED ✦',
+      subtitle: 'Shenlong-09 Pacified · Celestial Harmonic Resonance Restored',
+      type: 'unlock'
     });
 
     window.setTimeout(() => {
-      this.particles.emitShockwave(this.rootMesh.position, 8.0);
+      this.particles.emitShockwave(this.rootMesh.position, 9.0, Color3.FromHexString('#ffd700'));
       this.rootMesh.dispose();
 
-      // Trigger Victory State in React
-      GameBridge.emit('victory', {
-        timeElapsed: 180,
-        maxCombo: 35,
-        damageDealt: Math.round(this.maxHp),
-        rank: 'S'
-      });
+      // 6. Smoothly transition to score breakdown modal only after cinematic sequence finishes
+      window.setTimeout(() => {
+        GameBridge.emit('victory', {
+          timeElapsed: 165,
+          maxCombo: 38,
+          damageDealt: Math.round(this.maxHp),
+          rank: 'S'
+        });
+      }, 3400);
     }, 1200);
   }
 

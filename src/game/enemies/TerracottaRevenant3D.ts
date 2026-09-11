@@ -15,11 +15,38 @@ export class TerracottaRevenant3D extends EnemyBase3D {
     const jade = new StandardMaterial('revenantJadeCore', scene); jade.emissiveColor = Color3.FromHexString('#00ff88'); jade.disableLighting = true;
     const torso = MeshBuilder.CreateCylinder('revenantRibCage', { height: 1.15, diameterTop: 0.72, diameterBottom: 0.9, tessellation: 16 }, scene); torso.parent = rig; torso.position.y = 1.23; torso.material = ceramic;
     const core = MeshBuilder.CreateSphere('revenantReactor', { diameter: 0.34, segments: 16 }, scene); core.parent = rig; core.position = new Vector3(0, 1.3, 0.47); core.material = jade;
+    
+    // Asymmetric ceremonial general pauldron on right shoulder
+    const pauldron = MeshBuilder.CreateBox('revenantPauldron', { width: 0.45, height: 0.35, depth: 0.4 }, scene);
+    pauldron.parent = rig;
+    pauldron.position = new Vector3(0.42, 1.78, 0);
+    pauldron.rotation.z = -0.2;
+    pauldron.material = ceramic;
+    const pauldronTrim = MeshBuilder.CreateBox('revenantPauldronTrim', { width: 0.48, height: 0.08, depth: 0.42 }, scene);
+    pauldronTrim.parent = pauldron;
+    pauldronTrim.position.y = 0.15;
+    pauldronTrim.material = iron;
+
     [-0.31, 0.31].forEach((x) => {
       const shoulder = MeshBuilder.CreateSphere(`revenantShoulder_${x}`, { diameter: 0.36, segments: 16 }, scene); shoulder.parent = rig; shoulder.position = new Vector3(x, 1.66, 0); shoulder.material = iron;
       const arm = MeshBuilder.CreateCylinder(`revenantArm_${x}`, { height: 0.75, diameter: 0.17, tessellation: 16 }, scene); arm.parent = rig; arm.position = new Vector3(x * 1.15, 1.2, 0.04); arm.rotation.z = x * 0.1; arm.material = ceramic;
+      // Mechanical elbow joint
+      const elbowJoint = MeshBuilder.CreateTorus(`revenantElbow_${x}`, { diameter: 0.22, thickness: 0.05, tessellation: 12 }, scene);
+      elbowJoint.parent = rig; elbowJoint.position = new Vector3(x * 1.15, 1.2, 0.04); elbowJoint.material = iron;
+
       const leg = MeshBuilder.CreateCylinder(`revenantLeg_${x}`, { height: 0.82, diameter: 0.21, tessellation: 16 }, scene); leg.parent = rig; leg.position = new Vector3(x * 0.62, 0.43, 0); leg.material = ceramic;
+      // Knee servo ring
+      const kneeJoint = MeshBuilder.CreateTorus(`revenantKnee_${x}`, { diameter: 0.26, thickness: 0.05, tessellation: 12 }, scene);
+      kneeJoint.parent = rig; kneeJoint.position = new Vector3(x * 0.62, 0.43, 0); kneeJoint.material = iron;
     });
+
+    // Forearm guardian spike blade on left arm
+    const armBlade = MeshBuilder.CreateCylinder('revenantForearmBlade', { height: 0.5, diameterTop: 0.02, diameterBottom: 0.08, tessellation: 8 }, scene);
+    armBlade.parent = rig;
+    armBlade.position = new Vector3(-0.48, 0.9, 0.18);
+    armBlade.rotation.x = Math.PI / 2.5;
+    armBlade.material = iron;
+
     const mask = MeshBuilder.CreatePolyhedron('revenantCeremonialMask', { type: 1, size: 0.5 }, scene); mask.parent = rig; mask.position = new Vector3(0, 2.05, 0.08); mask.scaling.z = 0.65; mask.material = ceramic;
     const crest = MeshBuilder.CreateBox('revenantBrokenCrest', { width: 0.12, height: 0.56, depth: 0.12 }, scene); crest.parent = rig; crest.position.y = 2.38; crest.material = iron;
     for (let i = 0; i < 3; i++) { const cable = MeshBuilder.CreateTorus(`revenantCable_${i}`, { diameter: 0.52 + i * 0.08, thickness: 0.026, tessellation: 16 }, scene); cable.parent = rig; cable.position = new Vector3(0, 1.3, 0.48 + i * 0.012); cable.rotation.x = Math.PI / 2; cable.material = jade; }

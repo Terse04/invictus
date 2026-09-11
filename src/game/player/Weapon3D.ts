@@ -3,11 +3,13 @@ import {
   Mesh,
   MeshBuilder,
   StandardMaterial,
+  PBRMaterial,
   Color3,
   Vector3,
   TrailMesh,
   TransformNode
 } from '@babylonjs/core';
+import { SoundManager } from '../audio/SoundManager';
 
 export class Weapon3D {
   public rootNode: TransformNode;
@@ -40,11 +42,17 @@ export class Weapon3D {
     this.sayaMesh.parent = sheathNode;
     this.sayaMesh.position = new Vector3(0, -0.42, 0);
 
-    const sayaMat = new StandardMaterial('sayaMat', scene);
-    sayaMat.diffuseColor = new Color3(0.04, 0.06, 0.10); // Lacquered obsidian
-    sayaMat.specularColor = new Color3(0.5, 0.7, 0.9);
-    sayaMat.emissiveColor = new Color3(0.03, 0.11, 0.06); // Subtle jade lacquer inlay
+    const sayaMat = new PBRMaterial('pbrSayaMat', scene);
+    sayaMat.albedoColor = new Color3(0.04, 0.05, 0.08); // Lacquered obsidian
+    sayaMat.metallic = 0.2;
+    sayaMat.roughness = 0.25;
+    sayaMat.emissiveColor = new Color3(0.01, 0.08, 0.05); // Subtle jade lacquer
     this.sayaMesh.material = sayaMat;
+
+    const goldMat = new PBRMaterial('pbrWeaponGold', scene);
+    goldMat.albedoColor = new Color3(0.95, 0.78, 0.22);
+    goldMat.metallic = 0.95;
+    goldMat.roughness = 0.22;
 
     // Gold Sageo band on scabbard
     const bandMesh = MeshBuilder.CreateBox('sayaBand', {
@@ -54,15 +62,12 @@ export class Weapon3D {
     }, scene);
     bandMesh.parent = this.sayaMesh;
     bandMesh.position.y = 0.35;
-    const goldMat = new StandardMaterial('goldTrimMat', scene);
-    goldMat.diffuseColor = new Color3(0.95, 0.75, 0.2);
-    goldMat.emissiveColor = new Color3(0.4, 0.3, 0.05);
     bandMesh.material = goldMat;
 
     // 2. Weapon Root Node (holds the actual Katana: blade + guard + hilt)
     this.rootNode = new TransformNode('katanaRoot', scene);
 
-    // 3. Cyber-Katana Blade (Curved, slender, razor-sharp edge)
+    // 3. Cyber-Katana Blade (Folded cyber-steel with razor polished edge)
     this.bladeMesh = MeshBuilder.CreateBox('katanaBlade', {
       width: 0.04,
       height: 1.1,
@@ -71,23 +76,36 @@ export class Weapon3D {
     this.bladeMesh.parent = this.rootNode;
     this.bladeMesh.position.y = 0.58;
 
-    const bladeMat = new StandardMaterial('katanaBladeMat', scene);
-    bladeMat.diffuseColor = new Color3(0.55, 0.95, 1.0);
-    bladeMat.specularColor = new Color3(1, 1, 1);
-    bladeMat.emissiveColor = Color3.FromHexString('#00f0ff');
-    bladeMat.specularPower = 128;
+    const bladeMat = new PBRMaterial('pbrKatanaBladeMat', scene);
+    bladeMat.albedoColor = new Color3(0.85, 0.92, 0.98);
+    bladeMat.metallic = 0.96;
+    bladeMat.roughness = 0.14;
+    bladeMat.emissiveColor = new Color3(0.05, 0.35, 0.45);
     this.bladeMesh.material = bladeMat;
 
-    // Glowing plasma fuller (energy canal along spine)
+    // Resonant jade fuller (energy canal along spine)
     const fuller = MeshBuilder.CreateBox('bladeFuller', {
       width: 0.012,
       height: 0.95,
       depth: 0.02
     }, scene);
     fuller.parent = this.bladeMesh;
-    const fullerMat = new StandardMaterial('fullerMat', scene);
-    fullerMat.emissiveColor = Color3.FromHexString('#00f0ff');
+    const fullerMat = new PBRMaterial('pbrFullerMat', scene);
+    fullerMat.albedoColor = new Color3(0.0, 0.95, 0.65);
+    fullerMat.emissiveColor = new Color3(0.0, 0.9, 0.6);
+    fullerMat.metallic = 0.1;
+    fullerMat.roughness = 0.2;
     fuller.material = fullerMat;
+
+    // 3b. Habaki (Brass blade collar connecting blade to tsuba guard)
+    const habaki = MeshBuilder.CreateBox('katanaHabaki', {
+      width: 0.046,
+      height: 0.08,
+      depth: 0.022
+    }, scene);
+    habaki.parent = this.rootNode;
+    habaki.position.y = 0.06;
+    habaki.material = goldMat;
 
     // 4. Tsuba (Crossguard) - Ancient geometric octagonal plate
     this.guardMesh = MeshBuilder.CreateCylinder('tsuba', {
@@ -107,8 +125,10 @@ export class Weapon3D {
     this.hiltMesh.parent = this.rootNode;
     this.hiltMesh.position.y = -0.14;
 
-    const hiltMat = new StandardMaterial('tsukaMat', scene);
-    hiltMat.diffuseColor = new Color3(0.06, 0.08, 0.12);
+    const hiltMat = new PBRMaterial('pbrTsukaMat', scene);
+    hiltMat.albedoColor = new Color3(0.05, 0.07, 0.11);
+    hiltMat.metallic = 0.15;
+    hiltMat.roughness = 0.55;
     this.hiltMesh.material = hiltMat;
 
     // 6. Kashira (Pommel)
@@ -124,11 +144,14 @@ export class Weapon3D {
     this.tipNode.parent = this.bladeMesh;
     this.tipNode.position.y = 0.55;
 
-    // Start sheathed
-    this.sheathWeapon();
+    // Start sheathed without playing sound on init
+    this.isDrawn = false;
+    this.rootNode.parent = this.sheathNode;
+    this.rootNode.position = new Vector3(0, 0.08, 0);
+    this.rootNode.rotation = new Vector3(0, 0, 0);
   }
 
-  public drawWeapon() {
+  public drawWeapon(playSound = true) {
     if (this.isDrawn) return;
     this.isDrawn = true;
 
@@ -138,9 +161,17 @@ export class Weapon3D {
     this.rootNode.position = new Vector3(0, -0.05, 0.08);
     this.rootNode.rotation = new Vector3(Math.PI / 2.2, 0, 0);
 
+    if (playSound) {
+      try {
+        SoundManager.getInstance().playKatanaDraw();
+      } catch {
+        // audio context safety
+      }
+    }
   }
 
-  public sheathWeapon() {
+  public sheathWeapon(playSound = true) {
+    if (!this.isDrawn) return;
     this.isDrawn = false;
     this.deactivateTrail();
 
@@ -149,6 +180,14 @@ export class Weapon3D {
     // Align hilt directly above the scabbard opening
     this.rootNode.position = new Vector3(0, 0.08, 0);
     this.rootNode.rotation = new Vector3(0, 0, 0);
+
+    if (playSound) {
+      try {
+        SoundManager.getInstance().playSheathClick();
+      } catch {
+        // audio context safety
+      }
+    }
   }
 
   /** A short ribbon sampled from the moving blade, shown only during an attack swing. */

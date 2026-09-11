@@ -12,6 +12,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 import { QualityProfile, resolveQuality } from './QualitySettings';
+import { loadSettings } from '../utils/storage';
 
 export class GameEngine {
   public engine: Engine;
@@ -104,8 +105,9 @@ export class GameEngine {
 
   public configureRendering(camera: Camera) {
     this.renderingPipeline?.dispose();
+    const settings = loadSettings();
     const pipeline = new DefaultRenderingPipeline('celestialRenderingPipeline', true, this.scene, [camera]);
-    pipeline.bloomEnabled = true;
+    pipeline.bloomEnabled = settings.bloomEnabled;
     pipeline.bloomThreshold = 0.7;
     pipeline.bloomWeight = 0.35;
     pipeline.bloomKernel = 64;
@@ -116,6 +118,10 @@ export class GameEngine {
     pipeline.imageProcessing.contrast = 1.0;
     pipeline.imageProcessing.exposure = 1.15;
     this.renderingPipeline = pipeline;
+
+    if (!settings.fogEnabled) {
+      this.scene.fogMode = Scene.FOGMODE_NONE;
+    }
   }
 
   public dispose() {

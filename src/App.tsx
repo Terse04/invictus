@@ -10,6 +10,7 @@ import { VictoryModal } from './components/VictoryModal';
 import { OrientationNotice } from './components/OrientationNotice';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { StartScreen } from './components/StartScreen';
+import { ChapterSplash } from './components/ChapterSplash';
 import { loadProgress, saveProgress } from './utils/storage';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -188,6 +189,7 @@ export const App: React.FC = () => {
         <BossBar />
         <VirtualControls />
         <DialogueBox />
+        <ChapterSplash key={currentChapter} chapter={currentChapter} />
 
         {/* Modals */}
         <PauseModal

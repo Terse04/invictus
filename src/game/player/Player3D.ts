@@ -27,7 +27,11 @@ export type PlayerAnimState =
   | 'heavy_release'
   | 'dodge'
   | 'hurt'
-  | 'death';
+  | 'death'
+  | 'summon_crouch'
+  | 'summon_rise'
+  | 'victory_flick'
+  | 'victory_sheath';
 
 export class Player3D {
   public scene: Scene;
@@ -104,6 +108,7 @@ export class Player3D {
   public rightFootNode!: TransformNode;
 
   public visibleMeshes: Mesh[] = [];
+  public coatTails: Mesh[] = [];
   private soundManager: SoundManager;
   private inputKeys: { [key: string]: boolean } = {};
 
@@ -241,25 +246,57 @@ export class Player3D {
     visor.material = circuitMat;
     this.visibleMeshes.push(visor);
 
-    // Anime styled hair buns & ponytail
-    const hairTop = MeshBuilder.CreateSphere('hairTop', { diameter: 0.26, segments: 12 }, scene);
+    // Anime styled dual buns, high ponytail & crossed golden hairpins
+    const hairTop = MeshBuilder.CreateSphere('hairTop', { diameter: 0.27, segments: 16 }, scene);
     hairTop.parent = this.headNode;
-    hairTop.position = new Vector3(0, 0.06, -0.04);
+    hairTop.position = new Vector3(0, 0.07, -0.04);
     hairTop.material = hairMat;
     this.visibleMeshes.push(hairTop);
 
-    const hairBun = MeshBuilder.CreateSphere('hairBun', { diameter: 0.16 }, scene);
-    hairBun.parent = this.headNode;
-    hairBun.position = new Vector3(0, 0.16, -0.12);
-    hairBun.material = hairMat;
-    this.visibleMeshes.push(hairBun);
+    // Left and Right coiled buns
+    const hairBunL = MeshBuilder.CreateSphere('hairBunL', { diameter: 0.13, segments: 12 }, scene);
+    hairBunL.parent = this.headNode;
+    hairBunL.position = new Vector3(-0.12, 0.14, -0.08);
+    hairBunL.material = hairMat;
+    this.visibleMeshes.push(hairBunL);
 
-    const hairPin = MeshBuilder.CreateCylinder('hairPin', { height: 0.32, diameter: 0.015 }, scene);
-    hairPin.parent = this.headNode;
-    hairPin.position = new Vector3(0, 0.18, -0.12);
-    hairPin.rotation.z = Math.PI / 2.8;
-    hairPin.material = goldMat;
-    this.visibleMeshes.push(hairPin);
+    const hairBunR = MeshBuilder.CreateSphere('hairBunR', { diameter: 0.13, segments: 12 }, scene);
+    hairBunR.parent = this.headNode;
+    hairBunR.position = new Vector3(0.12, 0.14, -0.08);
+    hairBunR.material = hairMat;
+    this.visibleMeshes.push(hairBunR);
+
+    // Flowing trailing ponytail behind neck
+    const ponytail = MeshBuilder.CreateCylinder('hairPonytail', { height: 0.38, diameterTop: 0.08, diameterBottom: 0.02, tessellation: 12 }, scene);
+    ponytail.parent = this.headNode;
+    ponytail.position = new Vector3(0, -0.08, -0.16);
+    ponytail.rotation.x = -0.32;
+    ponytail.material = hairMat;
+    this.visibleMeshes.push(ponytail);
+
+    // Crossed Imperial Gold Hairpins
+    const hairPin1 = MeshBuilder.CreateCylinder('hairPin1', { height: 0.34, diameter: 0.016 }, scene);
+    hairPin1.parent = this.headNode;
+    hairPin1.position = new Vector3(0, 0.17, -0.08);
+    hairPin1.rotation = new Vector3(0.1, 0, Math.PI / 3.2);
+    hairPin1.material = goldMat;
+    this.visibleMeshes.push(hairPin1);
+
+    const hairPin2 = MeshBuilder.CreateCylinder('hairPin2', { height: 0.34, diameter: 0.016 }, scene);
+    hairPin2.parent = this.headNode;
+    hairPin2.position = new Vector3(0, 0.17, -0.08);
+    hairPin2.rotation = new Vector3(-0.1, 0, -Math.PI / 3.2);
+    hairPin2.material = goldMat;
+    this.visibleMeshes.push(hairPin2);
+
+    // Glowing Jade Hairpin Orbs
+    [-1, 1].forEach(side => {
+      const pinOrb = MeshBuilder.CreateSphere(`hairPinOrb_${side}`, { diameter: 0.04 }, scene);
+      pinOrb.parent = this.headNode;
+      pinOrb.position = new Vector3(side * 0.16, 0.24, -0.08);
+      pinOrb.material = circuitMat;
+      this.visibleMeshes.push(pinOrb);
+    });
 
     // --- Arms (Left & Right) ---
     // Left Arm
@@ -395,38 +432,69 @@ export class Player3D {
     rightBoot.material = goldMat;
     this.visibleMeshes.push(rightBoot);
 
-    // Temporary Lin Yun identity pass. This remains explicitly GLB-ready until an authored asset arrives.
+    // --- Lin Yun Cyber-Mythic Aesthetics: Haori Coat Tails, Asymmetric Pauldron & Jade Talisman ---
     const coatMat = new StandardMaterial('linYunCoat', scene);
-    coatMat.diffuseColor = new Color3(0.10, 0.16, 0.15);
-    coatMat.emissiveColor = new Color3(0.01, 0.035, 0.022);
+    coatMat.diffuseColor = new Color3(0.08, 0.12, 0.14);
+    coatMat.specularColor = new Color3(0.3, 0.5, 0.45);
+    coatMat.emissiveColor = new Color3(0.015, 0.04, 0.03);
+    coatMat.backFaceCulling = false;
+
     const trimMat = new StandardMaterial('linYunJadeTrim', scene);
-    trimMat.emissiveColor = new Color3(0.06, 0.42, 0.23);
-    trimMat.disableLighting = true;
-    [-1, 1].forEach(side => {
-      const coatTail = MeshBuilder.CreatePlane(`linYunCoatTail_${side}`, { width: 0.29, height: 0.72 }, scene);
-      coatTail.parent = this.hipsNode;
-      coatTail.position = new Vector3(side * 0.15, -0.34, -0.12);
-      coatTail.rotation = new Vector3(0.12, side * 0.22, 0);
-      coatTail.material = coatMat;
-      this.visibleMeshes.push(coatTail);
-      const cable = MeshBuilder.CreateTorus(`linYunCable_${side}`, { diameter: 0.32, thickness: 0.022, tessellation: 10 }, scene);
-      cable.parent = this.chestNode;
-      cable.position = new Vector3(side * 0.18, 0.18, 0.18);
-      cable.rotation.x = Math.PI / 2;
-      cable.material = trimMat;
-      this.visibleMeshes.push(cable);
+    trimMat.diffuseColor = new Color3(0.02, 0.22, 0.14);
+    trimMat.emissiveColor = Color3.FromHexString('#00ff88');
+    trimMat.specularColor = new Color3(0.6, 0.9, 0.7);
+
+    // 4 Layered Flared Coat Tails (Front-Left, Front-Right, Back-Left, Back-Right)
+    const coatConfigs = [
+      { name: 'linYunCoatTail_FL', pos: new Vector3(-0.16, -0.36, 0.08), rot: new Vector3(-0.08, -0.22, -0.12) },
+      { name: 'linYunCoatTail_FR', pos: new Vector3(0.16, -0.36, 0.08), rot: new Vector3(-0.08, 0.22, 0.12) },
+      { name: 'linYunCoatTail_BL', pos: new Vector3(-0.15, -0.36, -0.12), rot: new Vector3(0.14, 0.22, -0.08) },
+      { name: 'linYunCoatTail_BR', pos: new Vector3(0.15, -0.36, -0.12), rot: new Vector3(0.14, -0.22, 0.08) }
+    ];
+
+    coatConfigs.forEach(cfg => {
+      const tail = MeshBuilder.CreatePlane(cfg.name, { width: 0.28, height: 0.76 }, scene);
+      tail.parent = this.hipsNode;
+      tail.position = cfg.pos;
+      tail.rotation = cfg.rot;
+      tail.material = coatMat;
+      this.coatTails.push(tail);
+      this.visibleMeshes.push(tail);
     });
-    const shoulderFrame = MeshBuilder.CreateBox('linYunAsymmetricShoulder', { width: 0.3, height: 0.13, depth: 0.22 }, scene);
-    shoulderFrame.parent = this.leftShoulderNode;
-    shoulderFrame.position.y = 0.08;
-    shoulderFrame.material = goldMat;
-    this.visibleMeshes.push(shoulderFrame);
-    const spineHalo = MeshBuilder.CreateTorus('linYunSpineHalo', { diameter: 0.44, thickness: 0.028, tessellation: 12 }, scene);
+
+    // Layered Imperial Magistrate Pauldron (Left Shoulder)
+    const pauldronBase = MeshBuilder.CreateBox('linYunPauldronBase', { width: 0.26, height: 0.12, depth: 0.22 }, scene);
+    pauldronBase.parent = this.leftShoulderNode;
+    pauldronBase.position = new Vector3(-0.04, 0.07, 0);
+    pauldronBase.material = goldMat;
+    this.visibleMeshes.push(pauldronBase);
+
+    const pauldronPlates = MeshBuilder.CreateBox('linYunPauldronPlate', { width: 0.22, height: 0.06, depth: 0.26 }, scene);
+    pauldronPlates.parent = this.leftShoulderNode;
+    pauldronPlates.position = new Vector3(-0.06, 0.12, 0);
+    pauldronPlates.material = trimMat;
+    this.visibleMeshes.push(pauldronPlates);
+
+    // Spine Quantum Halo
+    const spineHalo = MeshBuilder.CreateTorus('linYunSpineHalo', { diameter: 0.44, thickness: 0.026, tessellation: 16 }, scene);
     spineHalo.parent = this.chestNode;
     spineHalo.position = new Vector3(0, 0.12, -0.17);
     spineHalo.rotation.x = Math.PI / 2;
     spineHalo.material = trimMat;
     this.visibleMeshes.push(spineHalo);
+
+    // Ceremonial Jade Talisman Pendant at Waist
+    const talismanCord = MeshBuilder.CreateCylinder('talismanCord', { height: 0.22, diameter: 0.012 }, scene);
+    talismanCord.parent = this.hipsNode;
+    talismanCord.position = new Vector3(0.08, -0.04, 0.15);
+    talismanCord.material = goldMat;
+    this.visibleMeshes.push(talismanCord);
+
+    const talismanJade = MeshBuilder.CreateDisc('talismanJade', { radius: 0.06, tessellation: 8 }, scene);
+    talismanJade.parent = talismanCord;
+    talismanJade.position.y = -0.12;
+    talismanJade.material = trimMat;
+    this.visibleMeshes.push(talismanJade);
   }
 
   private initInputs() {
@@ -842,7 +910,125 @@ export class Player3D {
         this.rightKneeNode.rotation.x = 0.55;
         break;
       }
+
+      case 'summon_crouch': {
+        // Controlled superhero/crouch landing stance
+        this.hipsNode.position.y = 0.52;
+        this.spineNode.rotation.x = 0.65;
+        this.headNode.rotation.x = 0.2;
+        this.leftHipNode.rotation = new Vector3(-0.35, 0, -0.4);
+        this.leftKneeNode.rotation.x = 1.35;
+        this.rightHipNode.rotation = new Vector3(0.55, 0, 0.3);
+        this.rightKneeNode.rotation.x = 0.4;
+        this.rightShoulderNode.rotation = new Vector3(0.9, -0.2, -0.3);
+        this.rightElbowNode.rotation.x = 0.5;
+        this.leftShoulderNode.rotation = new Vector3(-0.7, 0.2, 0.6);
+        this.leftElbowNode.rotation.x = 0.2;
+        break;
+      }
+
+      case 'summon_rise': {
+        // Smoothly rises and prepares weapon grip
+        this.hipsNode.position.y = 0.88;
+        this.spineNode.rotation.x = 0.08;
+        this.headNode.rotation.x = -0.05;
+        this.leftKneeNode.rotation.x = 0.1;
+        this.rightKneeNode.rotation.x = 0.1;
+        this.leftShoulderNode.rotation = new Vector3(0.12, 0.2, 0.15);
+        this.leftElbowNode.rotation.x = 0.4;
+        this.rightShoulderNode.rotation = new Vector3(0.35, -0.4, -0.1);
+        this.rightElbowNode.rotation.x = 0.85;
+        break;
+      }
+
+      case 'victory_flick': {
+        // Graceful horizontal blade flick / blood purge ("chiburi")
+        this.hipsNode.position.y = 0.92;
+        this.spineNode.rotation = new Vector3(-0.05, 0.35, 0);
+        this.headNode.rotation = new Vector3(-0.1, -0.25, 0);
+        this.rightShoulderNode.rotation = new Vector3(0.35, 1.25, -0.1);
+        this.rightElbowNode.rotation.x = 0.15;
+        this.leftShoulderNode.rotation = new Vector3(0.1, 0.15, 0.1);
+        this.leftElbowNode.rotation.x = 0.5;
+        break;
+      }
+
+      case 'victory_sheath': {
+        // Slow vertical katana sheath into left hip saya
+        this.hipsNode.position.y = 0.92;
+        this.spineNode.rotation.x = 0.05;
+        this.headNode.rotation.x = 0.15;
+        this.leftShoulderNode.rotation = new Vector3(0.15, 0.2, 0.2);
+        this.leftElbowNode.rotation.x = 0.6;
+        this.rightShoulderNode.rotation = new Vector3(0.5, -0.45, 0);
+        this.rightElbowNode.rotation.x = 0.95;
+        break;
+      }
     }
+
+    // Dynamic Combat Coat Tails Oscillation (Stride, Wind & Airflow)
+    if (this.coatTails.length > 0) {
+      const runFlutter = this.animState === 'run' ? Math.sin(this.stridePhase * 2) * 0.22 : 0;
+      const speedFlutter = this.isSprinting ? 0.35 : 0;
+      const airFlutter = this.animState === 'airborne' ? 0.45 : 0;
+      const idleBreath = Math.sin(this.idleTime * 0.0022) * 0.05;
+
+      this.coatTails.forEach((tail, idx) => {
+        const isBack = idx >= 2;
+        const sideMult = (idx % 2 === 0) ? -1 : 1;
+        tail.rotation.x = (isBack ? 0.14 : -0.08) + runFlutter + speedFlutter + airFlutter + idleBreath;
+        tail.rotation.z = sideMult * (0.1 + (this.isSprinting ? 0.15 : 0));
+      });
+    }
+  }
+
+  public playSummonLanding(onComplete?: () => void) {
+    this.controlsLocked = true;
+    this.animState = 'summon_crouch';
+    this.weapon.sheathWeapon(false);
+
+    // 1. Hold crouch landing for 1.8s
+    window.setTimeout(() => {
+      if (this.isDead) return;
+      this.animState = 'summon_rise';
+
+      // 2. Rise and draw weapon with metallic sound
+      window.setTimeout(() => {
+        if (this.isDead) return;
+        this.weapon.drawWeapon(true);
+
+        // 3. Brief ready stance before returning to idle
+        window.setTimeout(() => {
+          if (this.isDead) return;
+          this.animState = 'idle';
+          this.controlsLocked = false;
+          onComplete?.();
+        }, 1200);
+      }, 1400);
+    }, 1800);
+  }
+
+  public playVictorySequence(onComplete?: () => void) {
+    this.controlsLocked = true;
+    this.animState = 'victory_flick';
+    this.soundManager.playBladeFlick();
+
+    // 1. Flick hold
+    window.setTimeout(() => {
+      if (this.isDead) return;
+      this.animState = 'victory_sheath';
+
+      // 2. Click sword into saya
+      window.setTimeout(() => {
+        if (this.isDead) return;
+        this.weapon.sheathWeapon(true);
+        this.animState = 'idle';
+
+        window.setTimeout(() => {
+          onComplete?.();
+        }, 800);
+      }, 1600);
+    }, 1400);
   }
 
   private applyAttackStep(progress: number, distance: number) {

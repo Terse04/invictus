@@ -33,6 +33,7 @@ export class Game3D {
   private isDisposed = false;
   private isPaused = false;
   private foundryVictoryEmitted = false;
+  private soundManager = SoundManager.getInstance();
   public readonly chapter: 1 | 2;
 
   constructor(canvas: HTMLCanvasElement, chapter: 1 | 2 = 1) {
@@ -150,17 +151,45 @@ export class Game3D {
     });
 
     // 10. Start Ambient Procedural Soundtrack
-    SoundManager.getInstance().startBGM('ambient');
+    this.soundManager.startBGM('ambient');
 
-    // Welcome banner and objective
-    GameBridge.emit('toast_message', {
-      title: chapter === 2 ? '✦ CHAPTER II: THE ABYSSAL FOUNDRY' : '✦ CHAPTER I: THE CELESTIAL RUINS',
-      subtitle: chapter === 2 ? 'Breach the subterranean crucible to sever the automated war-foundry' : 'Traverse the 3D ruins to uncover the mystery of the Transmutation',
-      type: 'info'
+    // 11. Orchestrate Real-Time Cinematic Chapter Entry Sequence
+    this.playChapterEntrySequence();
+  }
+
+  private playChapterEntrySequence() {
+    this.player.controlsLocked = true;
+    this.player.animState = 'summon_crouch';
+    this.player.weapon.sheathWeapon(false);
+
+    // Cosmic quantum drone descent
+    this.soundManager.playCelestialDescent();
+
+    // Ignite the vertical summoning beam on the awakening seal
+    this.environment.triggerSummonBeam(2800);
+
+    // Camera crane descent track
+    const spawnTarget = new Vector3(0, 1.1, -5);
+    this.camera.playCinematicSequence([
+      { target: spawnTarget, alpha: -Math.PI / 2, beta: 0.38, radius: 24, duration: 2000 },
+      { target: spawnTarget, alpha: -Math.PI / 2.2, beta: 1.05, radius: 8.0, duration: 1600 },
+      { target: spawnTarget, alpha: -Math.PI / 2, beta: Math.PI / 2.35, radius: 4.8, duration: 1800 }
+    ]);
+
+    // Lin Yun animation sequence (crouch landing -> rising -> drawing blade -> combat idle)
+    this.player.playSummonLanding(() => {
+      GameBridge.emit('objective_update', {
+        text: this.chapter === 2 ? '✦ Quench the Molten Foundry Crucible' : '✦ Traverse the Celestial Sanctuary'
+      });
     });
-    GameBridge.emit('objective_update', {
-      text: chapter === 2 ? '✦ Quench the Molten Foundry Crucible' : '✦ Traverse the Celestial Sanctuary'
-    });
+
+    // At touchdown (~1.4s):
+    window.setTimeout(() => {
+      if (this.isDisposed) return;
+      this.particles.emitShockwave(new Vector3(0, 0.22, -5), 4.8, Color3.FromHexString('#00f0ff'));
+      this.soundManager.playLightningStrike();
+      this.camera.shake(0.35, 260);
+    }, 1400);
   }
 
   private spawnEnemies() {
@@ -232,6 +261,7 @@ export class Game3D {
     }
     this.foundryVictoryEmitted = false;
     this.spawnEnemies();
+    this.playChapterEntrySequence();
 
     GameBridge.emit('boss_encounter', {
       active: false,

@@ -2,9 +2,15 @@ export interface GameSettings {
   masterVolume: number;
   sfxVolume: number;
   bgmVolume: number;
+  uiVolume: number;
   screenShake: boolean;
   showDamageNumbers: boolean;
   particleQuality: 'low' | 'medium' | 'high';
+  bloomEnabled: boolean;
+  fogEnabled: boolean;
+  shadowQuality: 'off' | 'low' | 'high';
+  cameraSensitivity: number;
+  reticleStyle: 'default' | 'minimal' | 'dot';
 }
 
 export interface GameProgress {
@@ -25,9 +31,15 @@ export const defaultSettings: GameSettings = {
   masterVolume: 0.8,
   sfxVolume: 0.85,
   bgmVolume: 0.7,
+  uiVolume: 0.8,
   screenShake: true,
   showDamageNumbers: true,
-  particleQuality: 'high'
+  particleQuality: 'medium',
+  bloomEnabled: true,
+  fogEnabled: true,
+  shadowQuality: 'high',
+  cameraSensitivity: 1.0,
+  reticleStyle: 'default'
 };
 
 export const defaultProgress: GameProgress = {
