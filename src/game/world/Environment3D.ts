@@ -1,5 +1,5 @@
 import {
-  Scene, Mesh, MeshBuilder, StandardMaterial, Color3, Color4, Vector3,
+  Scene, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Material, Color3, Color4, Vector3,
   ShadowGenerator, ParticleSystem, VertexBuffer
 } from '@babylonjs/core';
 import { QualityProfile } from '../QualitySettings';
@@ -26,12 +26,12 @@ export class Environment3D {
 
   private buildSanctuary() {
     if (this.chapter === 2) { this.buildAbyssalFoundry(); return; }
-    const grass = this.material('terrainGrass', new Color3(0.13, 0.21, 0.14), new Color3(0.015, 0.03, 0.02));
-    const path = this.material('weatheredPath', new Color3(0.28, 0.27, 0.21), new Color3(0.03, 0.025, 0.015));
-    const stone = this.material('mossStone', new Color3(0.24, 0.28, 0.23), new Color3(0.015, 0.025, 0.015));
-    const darkStone = this.material('ruinObsidian', new Color3(0.105, 0.13, 0.13), new Color3(0.008, 0.012, 0.011));
-    const jade = this.material('jadeRune', new Color3(0.03, 0.23, 0.15), new Color3(0.02, 0.48, 0.27));
-    const amber = this.material('amberRune', new Color3(0.28, 0.17, 0.05), new Color3(0.36, 0.16, 0.02));
+    const grass = this.material('terrainGrass', new Color3(0.13, 0.21, 0.14), new Color3(0.015, 0.03, 0.02), 0.04, 0.85);
+    const path = this.material('weatheredPath', new Color3(0.28, 0.27, 0.21), new Color3(0.03, 0.025, 0.015), 0.08, 0.78);
+    const stone = this.material('mossStone', new Color3(0.24, 0.28, 0.23), new Color3(0.015, 0.025, 0.015), 0.08, 0.75);
+    const darkStone = this.material('ruinObsidian', new Color3(0.105, 0.13, 0.13), new Color3(0.008, 0.012, 0.011), 0.35, 0.35);
+    const jade = this.material('jadeRune', new Color3(0.0, 0.95, 0.55), new Color3(0.0, 0.85, 0.45), 0.10, 0.18);
+    const amber = this.material('amberRune', new Color3(0.95, 0.55, 0.12), new Color3(0.90, 0.45, 0.08), 0.10, 0.20);
 
     // One uninterrupted terrain mesh replaces isolated platforms and chasms.
     const terrain = MeshBuilder.CreateGround('celestialSanctuaryTerrain', { width: 150, height: 270, subdivisions: 100 }, this.scene);
@@ -123,7 +123,7 @@ export class Environment3D {
   }
 
   /** Large landmarks are sparse on purpose: they create a civilization, not prop noise. */
-  private createTransmutationLandmarks(ruin: StandardMaterial, jade: StandardMaterial, amber: StandardMaterial) {
+  private createTransmutationLandmarks(ruin: Material, jade: Material, amber: Material) {
     // A shattered guardian on the approach — Chinese influence is dominant.
     const statue = new Mesh('fallenCelestialGuardian', this.scene);
     statue.position = new Vector3(-22, 0, 48);
@@ -165,16 +165,16 @@ export class Environment3D {
     reactor.position = new Vector3(0, 0.35, 192); reactor.material = amber;
   }
 
-  private material(name: string, diffuse: Color3, emissive: Color3) {
-    const material = new StandardMaterial(name, this.scene);
-    material.diffuseColor = diffuse;
-    material.emissiveColor = emissive;
-    material.specularColor = new Color3(0.12, 0.15, 0.12);
-    material.specularPower = 24;
-    return material;
+  private material(name: string, diffuse: Color3, emissive: Color3, metallic = 0.15, roughness = 0.65): Material {
+    const mat = new PBRMaterial(name, this.scene);
+    mat.albedoColor = diffuse;
+    mat.emissiveColor = emissive;
+    mat.metallic = metallic;
+    mat.roughness = roughness;
+    return mat;
   }
 
-  private createTerrace(pos: Vector3, diameter: number, height: number, stone: StandardMaterial, rune?: StandardMaterial, hasRunicRing = false) {
+  private createTerrace(pos: Vector3, diameter: number, height: number, stone: Material, rune?: Material, hasRunicRing = false) {
     const terrace = MeshBuilder.CreateCylinder(`terrace_${pos.z}`, { height, diameter, tessellation: 40 }, this.scene);
     terrace.position = pos.subtract(new Vector3(0, height / 2, 0));
     terrace.checkCollisions = true;
@@ -188,7 +188,7 @@ export class Environment3D {
     }
   }
 
-  private createAwakeningSeal(stone: StandardMaterial, darkStone: StandardMaterial, jade: StandardMaterial) {
+  private createAwakeningSeal(stone: Material, darkStone: Material, jade: Material) {
     const sealRoot = new Mesh('awakeningSealRoot', this.scene);
     sealRoot.position = new Vector3(0, 0.19, -5);
     this.awakeningSealMesh = sealRoot;
@@ -276,7 +276,7 @@ export class Environment3D {
     }, 16);
   }
 
-  private createTorii(pos: Vector3, stone: StandardMaterial, rune: StandardMaterial) {
+  private createTorii(pos: Vector3, stone: Material, rune: Material) {
     const root = new Mesh(`weatheredTorii_${pos.z}`, this.scene);
     root.position = pos;
 
@@ -331,7 +331,7 @@ export class Environment3D {
     runeBand.material = rune;
   }
 
-  private createColonnade(stone: StandardMaterial, rune: StandardMaterial) {
+  private createColonnade(stone: Material, rune: Material) {
     for (let z = 76; z <= 103; z += 6.5) {
       [-1, 1].forEach((side) => {
         const column = MeshBuilder.CreateCylinder(`buriedColumn_${z}_${side}`, { height: 4.3 + (z % 3), diameter: 0.9, tessellation: 10 }, this.scene);
@@ -348,7 +348,7 @@ export class Environment3D {
     }
   }
 
-  private scatterNature(stone: StandardMaterial, grass: StandardMaterial) {
+  private scatterNature(stone: Material, grass: Material) {
     const rock = MeshBuilder.CreatePolyhedron('boulderSource', { type: 2, size: 1.7 }, this.scene);
     rock.material = stone;
     rock.isVisible = false;
@@ -377,7 +377,7 @@ export class Environment3D {
     }
   }
 
-  private buildSky(amber: StandardMaterial) {
+  private buildSky(amber: Material) {
     const sky = MeshBuilder.CreateSphere('celestialSky', { diameter: 900, segments: 16, sideOrientation: Mesh.BACKSIDE }, this.scene);
     const skyMat = this.material('cloudedDawnSky', new Color3(0.13, 0.20, 0.28), new Color3(0.025, 0.045, 0.075));
     skyMat.backFaceCulling = false;

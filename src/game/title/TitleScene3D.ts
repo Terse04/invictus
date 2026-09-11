@@ -15,6 +15,8 @@ import {
   DefaultRenderingPipeline,
   ArcRotateCamera
 } from '@babylonjs/core';
+import { ProceduralCharacterVisual } from '../player/ProceduralCharacterVisual';
+import { Weapon3D } from '../player/Weapon3D';
 
 export class TitleScene3D {
   private engine: Engine;
@@ -165,200 +167,16 @@ export class TitleScene3D {
     root.position = new Vector3(0.72, 0.22, 0.15);
     root.rotation = new Vector3(0, -Math.PI / 5.2, 0);
 
-    // --- Premium Stylized Materials ---
-    // Deep Midnight Navy Armor
-    const armorMat = new StandardMaterial('titleLinYunArmor', this.scene);
-    armorMat.diffuseColor = Color3.FromHexString('#0f172a');
-    armorMat.specularColor = new Color3(0.45, 0.65, 0.85);
-    armorMat.specularPower = 48;
+    const visual = new ProceduralCharacterVisual(this.scene, root);
+    const weapon = new Weapon3D(this.scene, visual.attachments.rightHandNode, visual.attachments.sheathMountNode);
+    weapon.sheathWeapon(false);
 
-    // Glowing Jade/Cyan Circuit Trim
-    const circuitMat = new StandardMaterial('titleLinYunCircuit', this.scene);
-    circuitMat.diffuseColor = new Color3(0.01, 0.14, 0.18);
-    circuitMat.emissiveColor = Color3.FromHexString('#00f0ff');
-    circuitMat.specularColor = new Color3(0.6, 0.9, 0.8);
-
-    // Imperial Gold Accents
-    const goldMat = new StandardMaterial('titleLinYunGold', this.scene);
-    goldMat.diffuseColor = new Color3(0.85, 0.68, 0.22);
-    goldMat.emissiveColor = new Color3(0.32, 0.22, 0.04);
-    goldMat.specularColor = new Color3(1.0, 0.85, 0.4);
-
-    // Porcelain Skin
-    const skinMat = new StandardMaterial('titleLinYunSkin', this.scene);
-    skinMat.diffuseColor = new Color3(0.95, 0.88, 0.83);
-
-    // Raven Black Hair
-    const hairMat = new StandardMaterial('titleLinYunHair', this.scene);
-    hairMat.diffuseColor = new Color3(0.04, 0.05, 0.08);
-
-    // --- Hierarchy ---
-    // Pelvis
-    const hipsNode = new TransformNode('titleHips', this.scene);
-    hipsNode.parent = root;
-    hipsNode.position.y = 0.92;
-
-    const pelvis = MeshBuilder.CreateBox('titlePelvis', { width: 0.35, height: 0.22, depth: 0.24 }, this.scene);
-    pelvis.parent = hipsNode;
-    pelvis.material = armorMat;
-
-    const sash = MeshBuilder.CreateBox('titleSash', { width: 0.37, height: 0.08, depth: 0.26 }, this.scene);
-    sash.parent = hipsNode;
-    sash.position.y = 0.07;
-    sash.material = goldMat;
-
-    // Spine & Chest
-    const spine = new TransformNode('titleSpine', this.scene);
-    spine.parent = hipsNode;
-    spine.position.y = 0.14;
-
-    const chest = new TransformNode('titleChest', this.scene);
-    chest.parent = spine;
-    chest.position.y = 0.22;
-
-    const cuirass = MeshBuilder.CreateCylinder('titleCuirass', {
-      height: 0.44,
-      diameterTop: 0.45,
-      diameterBottom: 0.32,
-      tessellation: 16
-    }, this.scene);
-    cuirass.parent = chest;
-    cuirass.position.y = 0.14;
-    cuirass.material = armorMat;
-
-    const chestCore = MeshBuilder.CreateBox('titleChestCore', { width: 0.07, height: 0.16, depth: 0.04 }, this.scene);
-    chestCore.parent = chest;
-    chestCore.position = new Vector3(0, 0.14, 0.18);
-    chestCore.material = circuitMat;
-
-    // Head, Visor & Anime Styled Bun
-    const head = new TransformNode('titleHead', this.scene);
-    head.parent = chest;
-    head.position.y = 0.42;
-
-    const headMesh = MeshBuilder.CreateSphere('titleHeadMesh', { diameter: 0.24, segments: 16 }, this.scene);
-    headMesh.parent = head;
-    headMesh.material = skinMat;
-
-    const visor = MeshBuilder.CreateBox('titleVisor', { width: 0.22, height: 0.038, depth: 0.11 }, this.scene);
-    visor.parent = head;
-    visor.position = new Vector3(0, 0.04, 0.09);
-    visor.material = circuitMat;
-
-    // Anime styled dual buns, ponytail & crossed golden hairpins
-    const hairTop = MeshBuilder.CreateSphere('titleHairTop', { diameter: 0.27, segments: 14 }, this.scene);
-    hairTop.parent = head;
-    hairTop.position = new Vector3(0, 0.07, -0.04);
-    hairTop.material = hairMat;
-
-    const hairBunL = MeshBuilder.CreateSphere('titleHairBunL', { diameter: 0.13, segments: 10 }, this.scene);
-    hairBunL.parent = head;
-    hairBunL.position = new Vector3(-0.12, 0.14, -0.08);
-    hairBunL.material = hairMat;
-
-    const hairBunR = MeshBuilder.CreateSphere('titleHairBunR', { diameter: 0.13, segments: 10 }, this.scene);
-    hairBunR.parent = head;
-    hairBunR.position = new Vector3(0.12, 0.14, -0.08);
-    hairBunR.material = hairMat;
-
-    const ponytail = MeshBuilder.CreateCylinder('titlePonytail', { height: 0.38, diameterTop: 0.08, diameterBottom: 0.02, tessellation: 10 }, this.scene);
-    ponytail.parent = head;
-    ponytail.position = new Vector3(0, -0.08, -0.16);
-    ponytail.rotation.x = -0.32;
-    ponytail.material = hairMat;
-
-    // Crossed Imperial Gold Hairpins
-    const hairPin1 = MeshBuilder.CreateCylinder('titleHairPin1', { height: 0.34, diameter: 0.016 }, this.scene);
-    hairPin1.parent = head;
-    hairPin1.position = new Vector3(0, 0.17, -0.08);
-    hairPin1.rotation = new Vector3(0.1, 0, Math.PI / 3.2);
-    hairPin1.material = goldMat;
-
-    const hairPin2 = MeshBuilder.CreateCylinder('titleHairPin2', { height: 0.34, diameter: 0.016 }, this.scene);
-    hairPin2.parent = head;
-    hairPin2.position = new Vector3(0, 0.17, -0.08);
-    hairPin2.rotation = new Vector3(-0.1, 0, -Math.PI / 3.2);
-    hairPin2.material = goldMat;
-
-    [-1, 1].forEach(side => {
-      const pinOrb = MeshBuilder.CreateSphere(`titlePinOrb_${side}`, { diameter: 0.04 }, this.scene);
-      pinOrb.parent = head;
-      pinOrb.position = new Vector3(side * 0.16, 0.24, -0.08);
-      pinOrb.material = circuitMat;
-    });
-
-    // Asymmetric Armor Shoulder (Left)
-    const leftShoulder = new TransformNode('titleLShoulder', this.scene);
-    leftShoulder.parent = chest;
-    leftShoulder.position = new Vector3(-0.28, 0.24, 0);
-
-    const leftPauldron = MeshBuilder.CreateBox('titleLPauldron', { width: 0.28, height: 0.12, depth: 0.2 }, this.scene);
-    leftPauldron.parent = leftShoulder;
-    leftPauldron.position.y = 0.06;
-    leftPauldron.material = goldMat;
-
-    const leftArm = MeshBuilder.CreateCylinder('titleLArm', { height: 0.52, diameter: 0.1, tessellation: 12 }, this.scene);
-    leftArm.parent = leftShoulder;
-    leftArm.position = new Vector3(0, -0.22, 0.04);
-    leftArm.rotation = new Vector3(0.2, 0.15, 0.1);
-    leftArm.material = armorMat;
-
-    // Right Weapon Arm & Cyber-Katana (Held low, angled dangerous & calm)
-    const rightShoulder = new TransformNode('titleRShoulder', this.scene);
-    rightShoulder.parent = chest;
-    rightShoulder.position = new Vector3(0.28, 0.22, 0);
-
-    const rightArm = MeshBuilder.CreateCylinder('titleRArm', { height: 0.54, diameter: 0.1, tessellation: 12 }, this.scene);
-    rightArm.parent = rightShoulder;
-    rightArm.position = new Vector3(0.04, -0.24, 0.08);
-    rightArm.rotation = new Vector3(0.32, -0.12, -0.15);
-    rightArm.material = armorMat;
-
-    const hand = new TransformNode('titleHand', this.scene);
-    hand.parent = rightShoulder;
-    hand.position = new Vector3(0.06, -0.52, 0.16);
-    hand.rotation = new Vector3(0.4, 0.25, -0.3);
-
-    // Cyber Katana
-    const bladeMat = new StandardMaterial('titleBladeMat', this.scene);
-    bladeMat.diffuseColor = new Color3(0.65, 0.95, 1.0);
-    bladeMat.emissiveColor = Color3.FromHexString('#00f0ff');
-    bladeMat.specularPower = 128;
-
-    const blade = MeshBuilder.CreateBox('titleBlade', { width: 0.032, height: 1.15, depth: 0.015 }, this.scene);
-    blade.parent = hand;
-    blade.position.y = 0.54;
-    blade.material = bladeMat;
-
-    const guard = MeshBuilder.CreateCylinder('titleGuard', { height: 0.02, diameter: 0.16, tessellation: 8 }, this.scene);
-    guard.parent = hand;
-    guard.material = goldMat;
-
-    const hilt = MeshBuilder.CreateCylinder('titleHilt', { height: 0.26, diameter: 0.034 }, this.scene);
-    hilt.parent = hand;
-    hilt.position.y = -0.14;
-    hilt.material = hairMat;
-
-    // Legs (Planted firmly on dais)
-    [-0.12, 0.12].forEach((x, idx) => {
-      const leg = MeshBuilder.CreateCylinder(`titleLeg_${idx}`, { height: 0.88, diameter: 0.14, tessellation: 12 }, this.scene);
-      leg.parent = root;
-      leg.position = new Vector3(x, 0.44, 0);
-      leg.material = armorMat;
-    });
-
-    // Flowing Coat Tails
-    const tails: Mesh[] = [];
-    [-1, 1].forEach(side => {
-      const tail = MeshBuilder.CreatePlane(`titleCoatTail_${side}`, { width: 0.28, height: 0.75 }, this.scene);
-      tail.parent = hipsNode;
-      tail.position = new Vector3(side * 0.14, -0.36, -0.11);
-      tail.rotation = new Vector3(0.12, side * 0.2, 0);
-      tail.material = armorMat;
-      tails.push(tail);
-    });
-
-    return { root, spine, head, tails };
+    return {
+      root,
+      spine: visual.spineNode,
+      head: visual.headNode,
+      tails: visual.coatTails
+    };
   }
 
   private buildRuinsEnvironment() {

@@ -1,18 +1,31 @@
-import { Color3, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, Scene, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import { EnemyBase3D } from './EnemyBase3D';
 import { Player3D } from '../player/Player3D';
 import { Telegraph3D } from '../combat/Telegraph3D';
 import { ParticleVFX3D } from '../vfx/ParticleVFX3D';
 import { ENEMY_CONFIGS } from '../data/enemyData';
 
-/** Temporary modular art proxy; replace with an authored Terracotta Revenant GLB when supplied. */
+/** Modular art proxy with PBR earthenware, fractured ceramic, and cybernetic servos. */
 export class TerracottaRevenant3D extends EnemyBase3D {
   constructor(scene: Scene, spawnPos: Vector3, target: Player3D, telegraph: Telegraph3D, particles: ParticleVFX3D) {
     super(scene, spawnPos, ENEMY_CONFIGS.terracottaRevenant, target, telegraph, particles);
     const rig = new TransformNode('terracottaRevenantRig', scene); rig.parent = this.rootMesh;
-    const ceramic = new StandardMaterial('revenantCeramic', scene); ceramic.diffuseColor = Color3.FromHexString('#8c4626'); ceramic.specularColor = new Color3(0.14, 0.06, 0.03); ceramic.specularPower = 20;
-    const iron = new StandardMaterial('revenantIron', scene); iron.diffuseColor = new Color3(0.08, 0.10, 0.10); iron.specularColor = new Color3(0.3, 0.35, 0.3);
-    const jade = new StandardMaterial('revenantJadeCore', scene); jade.emissiveColor = Color3.FromHexString('#00ff88'); jade.disableLighting = true;
+
+    const ceramic = new PBRMaterial('pbrRevenantCeramic', scene);
+    ceramic.albedoColor = Color3.FromHexString('#8c4626');
+    ceramic.metallic = 0.05;
+    ceramic.roughness = 0.82;
+
+    const iron = new PBRMaterial('pbrRevenantIron', scene);
+    iron.albedoColor = new Color3(0.12, 0.14, 0.16);
+    iron.metallic = 0.92;
+    iron.roughness = 0.38;
+
+    const jade = new PBRMaterial('pbrRevenantJadeCore', scene);
+    jade.albedoColor = new Color3(0.0, 0.95, 0.55);
+    jade.emissiveColor = new Color3(0.0, 0.9, 0.5);
+    jade.metallic = 0.05;
+    jade.roughness = 0.18;
     const torso = MeshBuilder.CreateCylinder('revenantRibCage', { height: 1.15, diameterTop: 0.72, diameterBottom: 0.9, tessellation: 16 }, scene); torso.parent = rig; torso.position.y = 1.23; torso.material = ceramic;
     const core = MeshBuilder.CreateSphere('revenantReactor', { diameter: 0.34, segments: 16 }, scene); core.parent = rig; core.position = new Vector3(0, 1.3, 0.47); core.material = jade;
     

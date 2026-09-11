@@ -3,6 +3,7 @@ import {
   Mesh,
   MeshBuilder,
   StandardMaterial,
+  PBRMaterial,
   Color3,
   Vector3,
   TransformNode
@@ -31,7 +32,9 @@ export class ShenlongBoss3D {
   private isIntroPlaying = false;
 
   // AI & Attack state
-  private attackState: 'IDLE' | 'TELEGRAPH' | 'ATTACK' | 'BEAM' | 'STAGGER' = 'IDLE';
+  public attackState: 'IDLE' | 'TELEGRAPH' | 'ATTACK' | 'BEAM' | 'STAGGER' = 'IDLE';
+  public get state() { return this.attackState; }
+  public set state(val: any) { this.attackState = val; }
   private lastAttackTime = 0;
   private attackCooldown = 2600;
   private isOverdrive = false;
@@ -43,9 +46,9 @@ export class ShenlongBoss3D {
   private flightTimer = 0;
 
   // Materials
-  private headMat: StandardMaterial;
-  private bodyMat: StandardMaterial;
-  private hornMat: StandardMaterial;
+  private headMat: PBRMaterial;
+  private bodyMat: PBRMaterial;
+  private hornMat: PBRMaterial;
 
   constructor(
     scene: Scene,
@@ -70,19 +73,25 @@ export class ShenlongBoss3D {
     this.rootMesh.position.y = 3.5; // Hovering height
     this.rootMesh.checkCollisions = true;
 
-    // Materials
-    this.headMat = new StandardMaterial('dragonHeadMat', scene);
-    this.headMat.diffuseColor = new Color3(0.06, 0.12, 0.22); // Deep celestial indigo
-    this.headMat.emissiveColor = new Color3(0.0, 0.45, 0.65); // Cyan cybernetic channels
+    // PBR Materials
+    this.headMat = new PBRMaterial('pbrDragonHeadMat', scene);
+    this.headMat.albedoColor = new Color3(0.06, 0.12, 0.22); // Deep celestial indigo
+    this.headMat.metallic = 0.85;
+    this.headMat.roughness = 0.28;
+    this.headMat.emissiveColor = new Color3(0.0, 0.35, 0.55); // Cyan cybernetic channels
     this.rootMesh.visibility = 0;
 
-    this.hornMat = new StandardMaterial('dragonHornMat', scene);
-    this.hornMat.diffuseColor = new Color3(0.9, 0.75, 0.2);
-    this.hornMat.emissiveColor = new Color3(0.4, 0.3, 0.05); // Imperial gold horns
+    this.hornMat = new PBRMaterial('pbrDragonHornMat', scene);
+    this.hornMat.albedoColor = new Color3(0.95, 0.78, 0.22);
+    this.hornMat.metallic = 0.95;
+    this.hornMat.roughness = 0.22;
+    this.hornMat.emissiveColor = new Color3(0.2, 0.15, 0.02); // Imperial gold horns
 
-    this.bodyMat = new StandardMaterial('dragonBodyMat', scene);
-    this.bodyMat.diffuseColor = new Color3(0.08, 0.14, 0.24);
-    this.bodyMat.emissiveColor = new Color3(0.0, 0.35, 0.5);
+    this.bodyMat = new PBRMaterial('pbrDragonBodyMat', scene);
+    this.bodyMat.albedoColor = new Color3(0.08, 0.14, 0.24);
+    this.bodyMat.metallic = 0.88;
+    this.bodyMat.roughness = 0.30;
+    this.bodyMat.emissiveColor = new Color3(0.0, 0.25, 0.40);
 
     const dragonVisual = new TransformNode('shenlongVisualRig', scene);
     dragonVisual.parent = this.rootMesh;
@@ -90,8 +99,19 @@ export class ShenlongBoss3D {
     skull.parent = dragonVisual; skull.scaling = new Vector3(0.9, 0.72, 1.3); skull.position = new Vector3(0, 0.15, 0.55); skull.material = this.headMat;
     const muzzle = MeshBuilder.CreateBox('shenlongMuzzle', { width: 1.35, height: 0.55, depth: 1.25 }, scene);
     muzzle.parent = dragonVisual; muzzle.position = new Vector3(0, -0.25, 1.55); muzzle.material = this.bodyMat;
+    
+    // Articulated predator cyber-jaw with golden fangs
     const jaw = MeshBuilder.CreateBox('shenlongJaw', { width: 1.18, height: 0.24, depth: 1.08 }, scene);
     jaw.parent = dragonVisual; jaw.position = new Vector3(0, -0.66, 1.43); jaw.material = this.hornMat;
+
+    [-0.38, 0.38].forEach((fangX) => {
+      const fang = MeshBuilder.CreateCylinder(`shenlongFang_${fangX}`, { height: 0.32, diameterTop: 0.02, diameterBottom: 0.08 }, scene);
+      fang.parent = jaw;
+      fang.position = new Vector3(fangX, 0.18, 0.35);
+      fang.rotation.x = Math.PI;
+      fang.material = this.hornMat;
+    });
+
     const collar = MeshBuilder.CreateTorus('shenlongReactorCollar', { diameter: 2.45, thickness: 0.17, tessellation: 16 }, scene);
     collar.parent = dragonVisual; collar.position = new Vector3(0, 0, -1.02); collar.rotation.x = Math.PI / 2; collar.material = this.hornMat;
 

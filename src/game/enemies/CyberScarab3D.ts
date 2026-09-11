@@ -1,20 +1,34 @@
-import { Color3, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, Scene, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import { EnemyBase3D } from './EnemyBase3D';
 import { Player3D } from '../player/Player3D';
 import { Telegraph3D } from '../combat/Telegraph3D';
 import { ParticleVFX3D } from '../vfx/ParticleVFX3D';
 import { ENEMY_CONFIGS } from '../data/enemyData';
 
-/** Temporary modular art proxy; authored relic-drone GLB slots into this class later. */
+/** Modular Egyptian-inspired relic drone with PBR lapis lazuli carapaces and solar core. */
 export class CyberScarab3D extends EnemyBase3D {
   private hover = 0;
   constructor(scene: Scene, spawnPos: Vector3, target: Player3D, telegraph: Telegraph3D, particles: ParticleVFX3D) {
     super(scene, spawnPos, ENEMY_CONFIGS.cyberScarab, target, telegraph, particles);
     this.isHovering = true;
     const rig = new TransformNode('cyberScarabRig', scene); rig.parent = this.rootMesh;
-    const bronze = new StandardMaterial('scarabBronze', scene); bronze.diffuseColor = new Color3(0.33, 0.19, 0.06); bronze.specularColor = new Color3(0.7, 0.46, 0.14);
-    const lapis = new StandardMaterial('scarabLapis', scene); lapis.diffuseColor = new Color3(0.02, 0.12, 0.23); lapis.emissiveColor = new Color3(0.02, 0.21, 0.38);
-    const core = new StandardMaterial('scarabCore', scene); core.emissiveColor = new Color3(0.95, 0.38, 0.08); core.disableLighting = true;
+
+    const bronze = new PBRMaterial('pbrScarabBronze', scene);
+    bronze.albedoColor = new Color3(0.82, 0.62, 0.18);
+    bronze.metallic = 0.92;
+    bronze.roughness = 0.24;
+
+    const lapis = new PBRMaterial('pbrScarabLapis', scene);
+    lapis.albedoColor = new Color3(0.04, 0.14, 0.35);
+    lapis.emissiveColor = new Color3(0.01, 0.05, 0.15);
+    lapis.metallic = 0.2;
+    lapis.roughness = 0.28;
+
+    const core = new PBRMaterial('pbrScarabCore', scene);
+    core.albedoColor = new Color3(1.0, 0.45, 0.08);
+    core.emissiveColor = new Color3(0.95, 0.40, 0.05);
+    core.metallic = 0.05;
+    core.roughness = 0.15;
     const body = MeshBuilder.CreateSphere('scarabShell', { diameterX: 1.05, diameterY: 0.48, diameterZ: 1.28, segments: 16 }, scene); body.parent = rig; body.position.y = 1.28; body.material = bronze;
     const split = MeshBuilder.CreateBox('scarabWingSplit', { width: 0.055, height: 0.08, depth: 0.9 }, scene); split.parent = rig; split.position = new Vector3(0, 1.48, 0); split.material = lapis;
 

@@ -1,18 +1,27 @@
-import { Color3, MeshBuilder, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, Scene, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import { EnemyBase3D } from './EnemyBase3D';
 import { Player3D } from '../player/Player3D';
 import { Telegraph3D } from '../combat/Telegraph3D';
 import { ParticleVFX3D } from '../vfx/ParticleVFX3D';
 import { ENEMY_CONFIGS } from '../data/enemyData';
 
-/** Temporary modular art proxy; deliberately built around a readable shield silhouette. */
+/** Modular Greek-inspired automaton with PBR aged bronze and oracle reactor core. */
 export class BronzeHoplite3D extends EnemyBase3D {
   private shieldIntegrity = 3;
   constructor(scene: Scene, spawnPos: Vector3, target: Player3D, telegraph: Telegraph3D, particles: ParticleVFX3D) {
     super(scene, spawnPos, ENEMY_CONFIGS.bronzeHoplite, target, telegraph, particles);
     const rig = new TransformNode('bronzeHopliteRig', scene); rig.parent = this.rootMesh;
-    const bronze = new StandardMaterial('hopliteBronze', scene); bronze.diffuseColor = new Color3(0.28, 0.16, 0.06); bronze.specularColor = new Color3(0.75, 0.48, 0.18);
-    const oracle = new StandardMaterial('hopliteOracleCore', scene); oracle.emissiveColor = new Color3(0.38, 0.16, 0.68); oracle.disableLighting = true;
+
+    const bronze = new PBRMaterial('pbrHopliteBronze', scene);
+    bronze.albedoColor = new Color3(0.42, 0.28, 0.12);
+    bronze.metallic = 0.90;
+    bronze.roughness = 0.28;
+
+    const oracle = new PBRMaterial('pbrHopliteOracleCore', scene);
+    oracle.albedoColor = new Color3(0.65, 0.25, 0.95);
+    oracle.emissiveColor = new Color3(0.55, 0.20, 0.85);
+    oracle.metallic = 0.1;
+    oracle.roughness = 0.18;
     const torso = MeshBuilder.CreateCylinder('hopliteCuirass', { height: 1.24, diameterTop: 0.86, diameterBottom: 0.72, tessellation: 16 }, scene); torso.parent = rig; torso.position.y = 1.3; torso.material = bronze;
     const helm = MeshBuilder.CreateSphere('hopliteHelmet', { diameter: 0.72, segments: 16 }, scene); helm.parent = rig; helm.position.y = 2.16; helm.material = bronze;
     const plume = MeshBuilder.CreateBox('hopliteOraclePlume', { width: 0.16, height: 0.7, depth: 0.42 }, scene); plume.parent = rig; plume.position = new Vector3(0, 2.56, -0.05); plume.material = oracle;

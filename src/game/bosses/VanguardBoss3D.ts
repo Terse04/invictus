@@ -3,6 +3,7 @@ import {
   Mesh,
   MeshBuilder,
   StandardMaterial,
+  PBRMaterial,
   Color3,
   Vector3,
   TransformNode
@@ -48,10 +49,11 @@ export class VanguardBoss3D extends EnemyBase3D {
     torso.parent = bossNode;
     torso.position.y = 1.6;
 
-    const armorMat = new StandardMaterial('vanguardArmorMat', scene);
-    armorMat.diffuseColor = new Color3(0.12, 0.16, 0.24); // Obsidian cyber-armor
-    armorMat.emissiveColor = new Color3(0.35, 0.25, 0.05); // Gold imperial circuit
-    armorMat.specularColor = new Color3(1.0, 0.85, 0.3);
+    const armorMat = new PBRMaterial('pbrVanguardArmorMat', scene);
+    armorMat.albedoColor = new Color3(0.12, 0.16, 0.24); // Obsidian cyber-armor
+    armorMat.metallic = 0.88;
+    armorMat.roughness = 0.26;
+    armorMat.emissiveColor = new Color3(0.08, 0.06, 0.02);
     torso.material = armorMat;
 
     // Glowing Lightning Core
@@ -59,8 +61,11 @@ export class VanguardBoss3D extends EnemyBase3D {
     core.parent = bossNode;
     core.position = new Vector3(0, 1.8, 0.58);
 
-    const coreMat = new StandardMaterial('vanguardCoreMat', scene);
+    const coreMat = new PBRMaterial('pbrVanguardCoreMat', scene);
+    coreMat.albedoColor = this.isVulcan ? Color3.FromHexString('#ff3b00') : new Color3(0.0, 0.95, 1.0);
     coreMat.emissiveColor = this.isVulcan ? Color3.FromHexString('#ff3b00') : new Color3(0.0, 0.95, 1.0);
+    coreMat.metallic = 0.05;
+    coreMat.roughness = 0.15;
     core.material = coreMat;
 
     // Helm & Crest
